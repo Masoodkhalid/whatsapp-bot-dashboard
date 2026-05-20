@@ -381,7 +381,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
     <div><div class="page-title">Dashboard</div><div class="page-sub">Manage contacts and run the bot</div></div>
     <div class="hdr-actions">
       <button class="btn btn-ghost btn-sm" onclick="nav('compose',document.querySelector('[onclick*=compose]'))">✏️ Edit Template</button>
-      <button class="btn btn-ghost btn-sm" id="launchChromeBtn" onclick="launchChrome()" title="Closes Chrome and relaunches it connected to this bot — no QR scan needed!">🔌 Launch Chrome for Bot</button>
+      <span id="chromeModeBadge" style="font-size:.72rem;padding:4px 10px;border-radius:99px;background:var(--card3);color:var(--text2);border:1px solid var(--border2);display:inline-flex;align-items:center;gap:5px">⏳ Detecting Chrome…</span>
       <button class="btn btn-primary" id="startBtn" onclick="startBot()">▶ Start Bot</button>
       <button class="btn btn-danger"  id="stopBtn"  onclick="stopBot()" disabled>■ Stop</button>
     </div>
@@ -800,6 +800,7 @@ window.addEventListener('DOMContentLoaded', () => {
   fetchStatus();
   fetchHistory();
   fetchLogsOnce();     // backfill existing logs
+  checkChromeMode();   // show which Chrome mode is active
   setupSSE();          // real-time from here on
 
   setInterval(()=>{ fetchStatus(); fetchContacts(); }, 3000);
@@ -1015,21 +1016,37 @@ function renderContacts(){
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BOT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function checkChromeMode(){
+  try{
+    const res = await fetch('/api/chrome-mode');
+    const d   = await res.json();
+    const badge = document.getElementById('chromeModeBadge');
+    if(!badge) return;
+    if(d.mode === 'applescript'){
+      badge.style.background = 'rgba(37,211,102,.15)';
+      badge.style.color      = 'var(--wa)';
+      badge.style.border     = '1px solid var(--wa)';
+      badge.textContent      = '🟢 Your Chrome — no setup needed';
+    } else if(d.mode === 'selenium_connected'){
+      badge.style.background = 'rgba(37,211,102,.15)';
+      badge.style.color      = 'var(--wa)';
+      badge.style.border     = '1px solid var(--wa)';
+      badge.textContent      = '🟢 ' + d.label;
+    } else {
+      badge.style.background = 'rgba(245,158,11,.12)';
+      badge.style.color      = 'var(--yellow)';
+      badge.style.border     = '1px solid var(--yellow)';
+      badge.textContent      = '🟡 ' + d.label;
+    }
+  } catch(e){}
+}
+
 async function launchChrome(){
-  const btn = document.getElementById('launchChromeBtn');
-  if(!confirm('This will close your current Chrome and reopen it connected to the bot.\n\nYour WhatsApp session will already be there — no QR scan needed.\n\nProceed?')) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ Launching…';
+  if(!confirm('This will close your current Chrome and reopen it connected to the bot.\n\nAll your tabs will restore automatically.\n\nProceed?')) return;
   const res = await fetch('/api/launch-chrome', {method:'POST'});
   const d   = await res.json();
-  btn.disabled = false;
-  btn.textContent = '🔌 Launch Chrome for Bot';
-  if(d.ok){
-    toast('✓ Chrome launched! WhatsApp should open automatically.', 'ok');
-    nav('logs', document.querySelector('[onclick*=logs]'));
-  } else {
-    toast(d.error || 'Failed to launch Chrome', 'err');
-  }
+  if(d.ok){ toast('✓ Chrome relaunching — wait a few seconds then start the bot.', 'ok'); setTimeout(checkChromeMode, 5000); }
+  else toast(d.error || 'Failed to launch Chrome', 'err');
 }
 
 async function startBot(){

@@ -248,8 +248,86 @@ def _do_send(driver: webdriver.Chrome, phone: str, message: str, wait_time: int)
     return False, f"Timed out after {wait_time}s — send button never appeared"
 
 
+def _send_via_applescript(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
+    """
+    macOS only — controls your EXISTING Chrome via AppleScript.
+    Finds the WhatsApp tab that is already open, navigates it to the send URL,
+    waits for the chat to load, then presses Enter to send.
+    No debug port, no Chrome restart, no QR scan needed.
+    """
+    url = (
+        "https://web.whatsapp.com/send"
+        f"?phone={phone}"
+        f"&text={urllib.parse.quote(message)}"
+    )
+
+    # ── Step 1: find WhatsApp tab and navigate it ──────────────────────────────
+    nav_script = f'''
+tell application "Google Chrome"
+    set waFound to false
+    repeat with w in every window
+        repeat with t in every tab of w
+            if URL of t contains "web.whatsapp.com" then
+                set index of w to 1
+                set active tab index of w to index of t
+                set URL of t to "{url}"
+                set waFound to true
+                exit repeat
+            end if
+        end repeat
+        if waFound then exit repeat
+    end repeat
+    if not waFound then
+        tell front window
+            make new tab with properties {{URL:"{url}"}}
+        end tell
+        set waFound to true
+    end if
+    activate
+    return waFound as string
+end tell
+'''
+    nav = subprocess.run(
+        ["osascript", "-e", nav_script],
+        capture_output=True, text=True, timeout=15
+    )
+    if nav.returncode != 0:
+        return False, f"AppleScript error: {nav.stderr.strip()[:200]}"
+
+    # ── Step 2: wait for WhatsApp to load the chat ────────────────────────────
+    push_log(f"  ↳ WhatsApp tab navigating… waiting {wait_time}s for chat to load")
+    time.sleep(wait_time)
+
+    # ── Step 3: press Enter to send (WhatsApp sends on Enter) ─────────────────
+    send_script = '''
+tell application "Google Chrome" to activate
+delay 0.5
+tell application "System Events"
+    keystroke return
+end tell
+'''
+    send = subprocess.run(
+        ["osascript", "-e", send_script],
+        capture_output=True, text=True, timeout=8
+    )
+    if send.returncode != 0:
+        return False, f"Could not press Enter: {send.stderr.strip()[:200]}"
+
+    time.sleep(1)
+    return True, ""
+
+
 def send_one(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
-    """Send a WhatsApp message, auto-recovering from a dead Chrome window."""
+    """
+    Send a WhatsApp message.
+    macOS → uses AppleScript to control your existing Chrome (no restart needed).
+    Other OS → uses Selenium (requires 'Launch Chrome for Bot' one-time setup).
+    """
+    # ── macOS: AppleScript path — works with any Chrome, no debug port ─────────
+    if platform.system() == "Darwin":
+        return _send_via_applescript(phone, message, wait_time)
+
+    # ── Windows / Linux: Selenium path ────────────────────────────────────────
     for attempt in range(2):
         try:
             driver = get_driver()
@@ -260,7 +338,7 @@ def send_one(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
                 push_log("Chrome window was closed — restarting browser...")
                 close_driver()
                 time.sleep(2)
-                continue   # retry with fresh driver
+                continue
             return False, f"Error: {err[:200]}"
     return False, "Chrome failed to recover after window was closed"
 
@@ -517,6 +595,17 @@ def start_bot():
     )
     bot_thread.start()
     return jsonify({"ok": True})
+
+
+@app.route("/api/chrome-mode", methods=["GET"])
+def chrome_mode():
+    """Tell the frontend which send method will be used."""
+    system = platform.system()
+    if system == "Darwin":
+        return jsonify({"mode": "applescript", "label": "✓ Using your existing Chrome (macOS)"})
+    if _is_debug_port_open():
+        return jsonify({"mode": "selenium_connected", "label": "✓ Connected to your Chrome"})
+    return jsonify({"mode": "selenium_own", "label": "⚠ Will open bot's own Chrome window"})
 
 
 @app.route("/api/launch-chrome", methods=["POST"])
