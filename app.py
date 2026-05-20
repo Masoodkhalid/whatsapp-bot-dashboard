@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import platform
+import socket
 import subprocess
 import threading
 import time
@@ -50,28 +51,39 @@ _driver: webdriver.Chrome | None = None
 
 # ── Chrome helpers ─────────────────────────────────────────────────────────────
 
-CHROME_DEBUG_PORT = 9222   # port used when Chrome is launched via launch_chrome script
+CHROME_DEBUG_PORT = 9222
+
+# macOS / Windows Chrome binary paths
+_CHROME_MAC = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+_CHROME_WIN = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+]
 
 
-def _try_connect_existing_chrome() -> webdriver.Chrome | None:
-    """
-    Try to attach Selenium to the user's already-running Chrome
-    (only works if Chrome was started with --remote-debugging-port=9222).
-    Returns a driver on success, None if Chrome isn't listening.
-    """
+def _is_debug_port_open() -> bool:
+    """Return True if Chrome is already listening on the debug port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        return s.connect_ex(("localhost", CHROME_DEBUG_PORT)) == 0
+
+
+def _connect_to_existing_chrome() -> webdriver.Chrome | None:
+    """Attach Selenium to already-running Chrome via debug port. Returns None if unavailable."""
+    if not _is_debug_port_open():
+        return None
     try:
         opts = ChromeOptions()
         opts.add_experimental_option("debuggerAddress", f"localhost:{CHROME_DEBUG_PORT}")
-        service = ChromeService(ChromeDriverManager().install())
-        driver  = webdriver.Chrome(service=service, options=opts)
-        _       = driver.window_handles   # raises immediately if port closed
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=opts)
+        _ = driver.window_handles
         return driver
     except Exception:
         return None
 
 
 def _build_own_driver() -> webdriver.Chrome:
-    """Launch the bot's own dedicated Chrome using wa_profile (fallback)."""
+    """Launch the bot's own Chrome using wa_profile (fallback when user's Chrome unavailable)."""
     WA_PROFILE_DIR.mkdir(exist_ok=True)
     opts = ChromeOptions()
     opts.add_argument(f"--user-data-dir={WA_PROFILE_DIR}")
@@ -81,23 +93,37 @@ def _build_own_driver() -> webdriver.Chrome:
     opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
-    service = ChromeService(ChromeDriverManager().install())
-    driver  = webdriver.Chrome(service=service, options=opts)
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=opts)
     driver.maximize_window()
     return driver
 
 
+def _ensure_whatsapp_tab(driver: webdriver.Chrome):
+    """
+    Switch to an already-open WhatsApp Web tab if one exists.
+    Only opens a new tab if WhatsApp isn't open anywhere.
+    """
+    for handle in driver.window_handles:
+        driver.switch_to.window(handle)
+        if "web.whatsapp.com" in driver.current_url:
+            push_log("✓ Found your existing WhatsApp tab — using it.")
+            return
+    # No WhatsApp tab found — open one without disturbing other tabs
+    push_log("Opening WhatsApp Web in a new tab…")
+    driver.execute_script("window.open('https://web.whatsapp.com', '_blank');")
+    time.sleep(4)
+    driver.switch_to.window(driver.window_handles[-1])
+
+
 def _is_logged_in(driver: webdriver.Chrome) -> bool:
-    """Return True if WhatsApp Web is authenticated."""
     try:
         driver.find_element(By.CSS_SELECTOR, 'canvas[aria-label="Scan me!"]')
-        return False   # QR visible → not logged in
+        return False
     except Exception:
         return True
 
 
-def _wait_for_login(driver: webdriver.Chrome, timeout: int = 120):
-    """Block until the user scans the QR code or timeout expires."""
+def _wait_for_login(driver: webdriver.Chrome, timeout: int = 120) -> bool:
     push_log("⚠ Please scan the QR code in the Chrome window to log in to WhatsApp.")
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -113,31 +139,31 @@ def get_driver() -> webdriver.Chrome:
     global _driver
     if _driver is not None:
         try:
-            _ = _driver.window_handles   # raises if session dead
+            _ = _driver.window_handles
             return _driver
         except Exception:
             close_driver()
 
-    # ── 1. Try attaching to the user's existing Chrome ──────────────────────
+    # ── 1. Try the user's own Chrome (debug port must be open) ───────────────
     push_log("Connecting to Chrome…")
-    driver = _try_connect_existing_chrome()
+    driver = _connect_to_existing_chrome()
     if driver:
         _driver = driver
-        push_log("✓ Connected to YOUR existing Chrome browser.")
+        push_log("✓ Connected to YOUR Chrome — no new window opened.")
+        _ensure_whatsapp_tab(_driver)
         if not _is_logged_in(_driver):
             _wait_for_login(_driver)
         else:
-            push_log("✓ WhatsApp already open — ready to send!")
+            push_log("✓ WhatsApp already logged in — ready to send!")
         return _driver
 
-    # ── 2. Fallback: open bot's own Chrome window ────────────────────────────
+    # ── 2. Fallback: bot's own Chrome ────────────────────────────────────────
     push_log("⚠ Could not connect to your Chrome.")
-    push_log("💡 TIP: Use 'Launch Chrome for Bot' button on the Dashboard to avoid this.")
-    push_log("Opening bot's own Chrome window instead…")
+    push_log("💡 Click 'Launch Chrome for Bot' on the Dashboard first, then start the bot.")
+    push_log("Opening bot's own Chrome window as fallback…")
     _driver = _build_own_driver()
     _driver.get("https://web.whatsapp.com")
     time.sleep(5)
-
     if not _is_logged_in(_driver):
         _wait_for_login(_driver)
     else:
@@ -171,11 +197,22 @@ _ERROR_SELECTORS = [
 
 def _do_send(driver: webdriver.Chrome, phone: str, message: str, wait_time: int) -> tuple[bool, str]:
     """Navigate to WhatsApp chat and click Send. Returns (ok, note)."""
-    # Check login before navigating
+    # Make sure we're on the WhatsApp tab before doing anything
+    wa_handle = None
+    for handle in driver.window_handles:
+        driver.switch_to.window(handle)
+        if "web.whatsapp.com" in driver.current_url:
+            wa_handle = handle
+            break
+    if wa_handle is None:
+        # Open WhatsApp in a new tab if it got closed
+        driver.execute_script("window.open('https://web.whatsapp.com', '_blank');")
+        time.sleep(4)
+        driver.switch_to.window(driver.window_handles[-1])
+
     if not _is_logged_in(driver):
         return False, "Not logged in — scan the QR code in Chrome first"
 
-    # Keep + unencoded so WhatsApp Web recognises the number correctly
     url = (
         "https://web.whatsapp.com/send"
         f"?phone={phone}"
@@ -485,35 +522,51 @@ def start_bot():
 @app.route("/api/launch-chrome", methods=["POST"])
 def launch_chrome():
     """
-    Kill any existing Chrome and relaunch it with --remote-debugging-port=9222
-    so the bot can attach to the user's own browser session.
+    Close Chrome gracefully and relaunch it with --remote-debugging-port=9222.
+    Uses --restore-last-session so all existing tabs (incl. WhatsApp) come back.
     """
+    # Already connected? Nothing to do.
+    if _is_debug_port_open():
+        push_log("✓ Chrome is already running in bot-connect mode!")
+        return jsonify({"ok": True, "msg": "Already connected"})
+
     system = platform.system()
     try:
-        if system == "Darwin":   # macOS
-            subprocess.Popen(["pkill", "-a", "-i", "Google Chrome"], stderr=subprocess.DEVNULL)
+        if system == "Darwin":
+            # Gracefully quit Chrome (preserves session for restore)
+            subprocess.run(
+                ["osascript", "-e", 'tell application "Google Chrome" to quit'],
+                capture_output=True, timeout=8
+            )
             time.sleep(2)
+            # Relaunch via the actual binary — NOT `open -a` — so flags are applied
             subprocess.Popen([
-                "open", "-a", "Google Chrome",
-                "--args", f"--remote-debugging-port={CHROME_DEBUG_PORT}"
+                _CHROME_MAC,
+                f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+                "--restore-last-session",       # brings back all your old tabs
             ])
+
         elif system == "Windows":
-            subprocess.Popen("taskkill /F /IM chrome.exe", shell=True, stderr=subprocess.DEVNULL)
+            subprocess.run("taskkill /F /IM chrome.exe", shell=True,
+                           capture_output=True, timeout=8)
             time.sleep(2)
-            chrome_paths = [
-                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-            ]
-            chrome_exe = next((p for p in chrome_paths if Path(p).exists()), None)
+            chrome_exe = next((p for p in _CHROME_WIN if Path(p).exists()), None)
             if not chrome_exe:
-                return jsonify({"ok": False, "error": "Chrome not found. Install Chrome first."})
-            subprocess.Popen([chrome_exe, f"--remote-debugging-port={CHROME_DEBUG_PORT}"])
+                return jsonify({"ok": False,
+                                "error": "Chrome not found. Is Google Chrome installed?"})
+            subprocess.Popen([
+                chrome_exe,
+                f"--remote-debugging-port={CHROME_DEBUG_PORT}",
+                "--restore-last-session",
+            ])
         else:
             return jsonify({"ok": False, "error": f"Unsupported OS: {system}"})
 
-        push_log(f"✓ Chrome launched with remote debugging on port {CHROME_DEBUG_PORT}.")
-        push_log("💡 Your WhatsApp session is already there — no QR scan needed!")
+        push_log("✓ Chrome is restarting with bot-connect mode enabled.")
+        push_log("💡 All your tabs (including WhatsApp) will restore automatically.")
+        push_log("Wait a few seconds, then click ▶ Start Bot.")
         return jsonify({"ok": True})
+
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
 
