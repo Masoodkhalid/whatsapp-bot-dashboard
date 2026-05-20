@@ -248,12 +248,16 @@ def _do_send(driver: webdriver.Chrome, phone: str, message: str, wait_time: int)
     return False, f"Timed out after {wait_time}s — send button never appeared"
 
 
-def _send_via_applescript(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
+def _send_via_open_cmd(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
     """
-    macOS only — controls your EXISTING Chrome via AppleScript.
-    Finds the WhatsApp tab that is already open, navigates it to the send URL,
-    waits for the chat to load, then presses Enter to send.
-    No debug port, no Chrome restart, no QR scan needed.
+    macOS — zero special permissions required.
+
+    Step 1: 'open -a Google Chrome URL' — opens the WhatsApp send-URL in your
+            existing Chrome. Uses the system 'open' command, NOT Apple Events,
+            so no Automation permission is needed.
+    Step 2: Wait for WhatsApp to load and pre-fill the message.
+    Step 3: Bring Chrome to front via 'open -a Google Chrome' (no permission).
+    Step 4: Press Enter via System Events (already permitted for iTerm).
     """
     url = (
         "https://web.whatsapp.com/send"
@@ -261,71 +265,27 @@ def _send_via_applescript(phone: str, message: str, wait_time: int) -> tuple[boo
         f"&text={urllib.parse.quote(message)}"
     )
 
-    # ── Step 1: find WhatsApp tab and navigate it ──────────────────────────────
-    nav_script = f'''
-tell application "Google Chrome"
-    set waFound to false
-    repeat with w in every window
-        repeat with t in every tab of w
-            if URL of t contains "web.whatsapp.com" then
-                set index of w to 1
-                set active tab index of w to index of t
-                set URL of t to "{url}"
-                set waFound to true
-                exit repeat
-            end if
-        end repeat
-        if waFound then exit repeat
-    end repeat
-    if not waFound then
-        tell front window
-            make new tab with properties {{URL:"{url}"}}
-        end tell
-        set waFound to true
-    end if
-    activate
-    return waFound as string
-end tell
-'''
-    nav = subprocess.run(
-        ["osascript", "-e", nav_script],
-        capture_output=True, text=True, timeout=15
-    )
-    if nav.returncode != 0:
-        err = nav.stderr.strip()
-        if "-1743" in err or "Not authorized" in err:
-            msg = (
-                "PERMISSION DENIED (-1743) — macOS is blocking Python from controlling Chrome. "
-                "Fix: System Settings → Privacy & Security → Automation → "
-                "find Terminal (or Python) → enable Google Chrome. "
-                "Then restart the bot."
-            )
-            push_log(f"⛔ {msg}")
-            return False, msg
-        return False, f"AppleScript error: {err[:200]}"
+    # ── Step 1: open URL in user's Chrome (no Automation permission needed) ───
+    subprocess.Popen(["open", "-a", "Google Chrome", url])
 
-    # ── Step 2: wait for WhatsApp to load the chat ────────────────────────────
-    push_log(f"  ↳ WhatsApp tab navigating… waiting {wait_time}s for chat to load")
+    # ── Step 2: wait for WhatsApp to load ─────────────────────────────────────
+    push_log(f"  ↳ Opening WhatsApp chat… waiting {wait_time}s for message to load")
     time.sleep(wait_time)
 
-    # ── Step 3: press Enter to send (WhatsApp sends on Enter) ─────────────────
-    send_script = '''
-tell application "Google Chrome" to activate
-delay 0.5
-tell application "System Events"
-    keystroke return
-end tell
-'''
-    send = subprocess.run(
-        ["osascript", "-e", send_script],
+    # ── Step 3 + 4: bring Chrome to front, then press Enter ───────────────────
+    # 'open -a' activates Chrome without Apple Events → no Chrome permission.
+    # System Events keystroke only → iTerm already has this permission.
+    subprocess.Popen(["open", "-a", "Google Chrome"])
+    time.sleep(0.8)
+
+    enter_script = 'tell application "System Events" to keystroke return'
+    result = subprocess.run(
+        ["osascript", "-e", enter_script],
         capture_output=True, text=True, timeout=8
     )
-    if send.returncode != 0:
-        err = send.stderr.strip()
-        if "-1743" in err or "Not authorized" in err:
-            push_log("⛔ Permission denied for System Events. Fix: System Settings → Privacy & Security → Automation → Terminal → enable Google Chrome.")
-            return False, "Permission denied — see instructions above"
-        return False, f"Could not press Enter: {err[:200]}"
+    if result.returncode != 0:
+        err = result.stderr.strip()
+        return False, f"Could not press Enter: {err[:150]}"
 
     time.sleep(1)
     return True, ""
@@ -337,9 +297,9 @@ def send_one(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
     macOS → uses AppleScript to control your existing Chrome (no restart needed).
     Other OS → uses Selenium (requires 'Launch Chrome for Bot' one-time setup).
     """
-    # ── macOS: AppleScript path — works with any Chrome, no debug port ─────────
+    # ── macOS: open command + System Events — no Chrome Automation permission ──
     if platform.system() == "Darwin":
-        return _send_via_applescript(phone, message, wait_time)
+        return _send_via_open_cmd(phone, message, wait_time)
 
     # ── Windows / Linux: Selenium path ────────────────────────────────────────
     for attempt in range(2):
