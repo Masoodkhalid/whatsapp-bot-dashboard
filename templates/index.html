@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>WhatsApp Bot Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TOKENS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+:root{
+  --bg:       #09090b;
+  --surface:  #111113;
+  --card:     #18181b;
+  --card2:    #1f1f23;
+  --card3:    #27272a;
+  --border:   #2e2e33;
+  --border2:  #3f3f46;
+  --wa:       #25d366;
+  --wa2:      #128c7e;
+  --wa-glow:  rgba(37,211,102,.18);
+  --wa-glow2: rgba(37,211,102,.08);
+  --red:      #ef4444;
+  --red-bg:   rgba(239,68,68,.1);
+  --yellow:   #f59e0b;
+  --yel-bg:   rgba(245,158,11,.1);
+  --blue:     #3b82f6;
+  --blu-bg:   rgba(59,130,246,.1);
+  --text:     #fafafa;
+  --text2:    #a1a1aa;
+  --text3:    #52525b;
+  --radius:   12px;
+  --radius-sm:8px;
+  --sh:       0 4px 24px rgba(0,0,0,.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5;overflow-x:hidden}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ APP SHELL ━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.app{display:flex;min-height:100vh}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SIDEBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.sidebar{
+  width:230px;min-width:230px;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  padding:0 0 20px;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:10;
+}
+.sidebar-logo{
+  display:flex;align-items:center;gap:11px;padding:22px 18px 20px;
+  border-bottom:1px solid var(--border);
+}
+.logo-mark{
+  width:36px;height:36px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--wa2),var(--wa));
+  display:grid;place-items:center;box-shadow:0 0 16px var(--wa-glow);
+}
+.logo-mark svg{width:20px;height:20px;fill:#fff}
+.logo-text{line-height:1.2}
+.logo-text strong{font-size:.95rem;font-weight:700;letter-spacing:-.3px}
+.logo-text span{font-size:.7rem;color:var(--wa);font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+
+.nav-section{padding:14px 10px 4px;font-size:.65rem;font-weight:600;color:var(--text3);letter-spacing:1.2px;text-transform:uppercase}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 12px;margin:1px 6px;
+  border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:.85rem;
+  font-weight:500;transition:all .15s;border:none;background:none;
+  width:calc(100% - 12px);text-align:left;
+}
+.nav-item:hover{background:var(--card2);color:var(--text)}
+.nav-item.active{background:var(--wa-glow2);color:var(--wa);border:1px solid rgba(37,211,102,.15)}
+.nav-item .ico{width:17px;text-align:center;font-size:.95rem;flex-shrink:0}
+.nav-count{
+  margin-left:auto;background:var(--wa);color:#000;font-size:.62rem;
+  font-weight:700;padding:1px 6px;border-radius:99px;min-width:18px;text-align:center
+}
+
+.sidebar-footer{margin-top:auto;padding:14px 10px 0;border-top:1px solid var(--border)}
+.bot-pill{
+  display:flex;align-items:center;gap:9px;padding:10px 12px;
+  border-radius:var(--radius-sm);background:var(--card2);border:1px solid var(--border);
+  font-size:.78rem;color:var(--text2);transition:all .3s;
+}
+.bot-pill.running{background:var(--wa-glow2);border-color:rgba(37,211,102,.25);color:var(--wa)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:all .3s;flex-shrink:0}
+.bot-pill.running .dot{background:var(--wa);box-shadow:0 0 8px var(--wa);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ MAIN ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.main{flex:1;overflow-x:hidden;min-width:0}
+.page{display:none;padding:28px 28px 60px}
+.page.active{display:block}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PAGE HEADER ━━━━━━━━━━━━━━━━━━━━━━━━ */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap}
+.page-title{font-size:1.4rem;font-weight:700;letter-spacing:-.5px}
+.page-sub{color:var(--text2);font-size:.82rem;margin-top:3px}
+.hdr-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ STAT CARDS ━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+.stat{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 20px;position:relative;overflow:hidden;transition:border-color .2s;
+}
+.stat:hover{border-color:var(--border2)}
+.stat::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:var(--radius) var(--radius) 0 0}
+.stat.s0::after{background:var(--text3)}
+.stat.s1::after{background:var(--wa)}
+.stat.s2::after{background:var(--red)}
+.stat.s3::after{background:var(--blue)}
+.stat.s4::after{background:var(--yellow)}
+.stat-lbl{font-size:.68rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.9px;margin-bottom:9px}
+.stat-val{font-family:'JetBrains Mono',monospace;font-size:2.1rem;font-weight:700;line-height:1;letter-spacing:-1px}
+.stat.s1 .stat-val{color:var(--wa)}
+.stat.s2 .stat-val{color:var(--red)}
+.stat.s3 .stat-val{color:var(--blue)}
+.stat.s4 .stat-val{color:var(--yellow)}
+.stat-bar{height:3px;background:var(--border);border-radius:3px;margin-top:12px;overflow:hidden}
+.stat-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.stat.s1 .stat-fill{background:var(--wa)}
+.stat.s2 .stat-fill{background:var(--red)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ LAYOUT GRIDS ━━━━━━━━━━━━━━━━━━━━━━━ */
+.col2{display:grid;grid-template-columns:1fr 400px;gap:18px;align-items:start}
+.col2b{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ CARD ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.card+.card{margin-top:14px}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 18px;border-bottom:1px solid var(--border);background:var(--card2);
+}
+.card-title{font-weight:600;font-size:.88rem;display:flex;align-items:center;gap:8px}
+.card-title .ico{font-size:.9rem}
+.card-body{padding:18px}
+.card-body.p0{padding:0}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BUTTONS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 14px;
+  border-radius:var(--radius-sm);border:1px solid transparent;
+  font-family:'Inter',sans-serif;font-size:.8rem;font-weight:500;
+  cursor:pointer;transition:all .15s;white-space:nowrap;text-decoration:none;
+}
+.btn-primary{background:var(--wa);color:#000;border-color:var(--wa)}
+.btn-primary:hover{background:#1fba59;box-shadow:0 0 12px var(--wa-glow)}
+.btn-primary:disabled{background:var(--border);color:var(--text3);border-color:var(--border);cursor:not-allowed;box-shadow:none}
+.btn-danger{background:transparent;color:var(--red);border-color:rgba(239,68,68,.35)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn-danger:disabled{opacity:.35;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--text2);border-color:var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2);background:var(--card2)}
+.btn-wa{background:var(--wa-glow2);color:var(--wa);border-color:rgba(37,211,102,.25)}
+.btn-wa:hover{background:var(--wa-glow);box-shadow:0 0 10px var(--wa-glow)}
+.btn-sm{padding:5px 10px;font-size:.74rem;border-radius:6px}
+.btn-xs{padding:3px 8px;font-size:.68rem;border-radius:5px}
+.btn-group{display:flex;gap:8px;align-items:center}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ FORM ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.field{margin-bottom:14px}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:.7rem;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px}
+input[type=text],input[type=number],textarea,select{
+  width:100%;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:9px 12px;color:var(--text);
+  font-family:'Inter',sans-serif;font-size:.84rem;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--wa);box-shadow:0 0 0 3px var(--wa-glow2)}
+input::placeholder,textarea::placeholder{color:var(--text3)}
+textarea{resize:vertical;min-height:80px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TABLE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.tbl-wrap{overflow-y:auto;max-height:440px}
+.tbl{width:100%;border-collapse:collapse;font-size:.81rem}
+.tbl th{
+  padding:9px 14px;text-align:left;font-size:.67rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.8px;color:var(--text2);
+  border-bottom:1px solid var(--border);background:var(--card3);
+  position:sticky;top:0;z-index:1;
+}
+.tbl td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,.02)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.76rem}
+.muted{color:var(--text2)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BADGE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  border-radius:99px;font-size:.67rem;font-weight:600;text-transform:uppercase;letter-spacing:.4px;
+}
+.b-sent{background:rgba(37,211,102,.12);color:var(--wa);border:1px solid rgba(37,211,102,.2)}
+.b-failed{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.b-skip{background:var(--yel-bg);color:var(--yellow);border:1px solid rgba(245,158,11,.2)}
+.b-pend{background:var(--blu-bg);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+.b-none{background:var(--card3);color:var(--text3);border:1px solid var(--border)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ FILTER BAR ━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.fbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card2);flex-wrap:wrap}
+.fbar input{flex:1;min-width:160px;padding:6px 10px;font-size:.8rem}
+.ftabs{display:flex;gap:3px}
+.ftab{
+  padding:4px 10px;border-radius:6px;font-size:.72rem;font-weight:500;cursor:pointer;
+  border:1px solid transparent;background:none;color:var(--text2);font-family:'Inter',sans-serif;
+  transition:all .12s;
+}
+.ftab:hover{background:var(--card);color:var(--text)}
+.ftab.on{background:var(--wa-glow2);color:var(--wa);border-color:rgba(37,211,102,.2)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TERMINAL / LIVE LOG ━━━━━━━━━━━━━━━━ */
+.terminal-wrap{
+  background:#0a0a0d;border:1px solid var(--border);border-radius:var(--radius);
+  overflow:hidden;display:flex;flex-direction:column;
+}
+.terminal-titlebar{
+  display:flex;align-items:center;gap:7px;padding:10px 14px;
+  background:#111116;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.tb-dot{width:11px;height:11px;border-radius:50%}
+.tb-dot.r{background:#ef4444}.tb-dot.y{background:#f59e0b}.tb-dot.g{background:#22c55e}
+.terminal-label{margin-left:6px;font-size:.72rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.terminal-toolbar{
+  display:flex;align-items:center;gap:6px;padding:8px 14px;
+  border-bottom:1px solid var(--border);background:var(--card2);flex-wrap:wrap;
+}
+.terminal-body{
+  flex:1;overflow-y:auto;padding:14px 16px;
+  font-family:'JetBrains Mono',monospace;font-size:.76rem;line-height:1.85;
+  background:#0a0a0d;
+}
+.terminal-body.fixed{height:340px}
+.tl{display:flex;gap:10px;align-items:baseline}
+.tl-ts{color:var(--text3);flex-shrink:0;font-size:.68rem}
+.tl-msg{flex:1;word-break:break-all}
+.tl.ok .tl-msg{color:#4ade80}
+.tl.err .tl-msg{color:#f87171}
+.tl.warn .tl-msg{color:#fbbf24}
+.tl.info .tl-msg{color:#94a3b8}
+.tl.dim .tl-msg{color:var(--text3)}
+.log-empty{color:var(--text3);padding:20px 0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:.75rem}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TEMPLATE EDITOR ━━━━━━━━━━━━━━━━━━━━ */
+.editor-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.editor-toolbar{
+  display:flex;align-items:center;gap:6px;padding:10px 14px;
+  background:var(--card2);border-bottom:1px solid var(--border);flex-wrap:wrap;
+}
+.toolbar-divider{width:1px;height:18px;background:var(--border);margin:0 2px}
+.fmt-btn{
+  padding:4px 8px;border-radius:5px;border:1px solid var(--border);
+  background:none;color:var(--text2);font-family:'JetBrains Mono',monospace;
+  font-size:.78rem;cursor:pointer;transition:all .12s;
+}
+.fmt-btn:hover{background:var(--card3);color:var(--text);border-color:var(--border2)}
+.fmt-btn.active{background:var(--wa-glow2);color:var(--wa);border-color:rgba(37,211,102,.3)}
+.var-chip{
+  padding:3px 9px;border-radius:99px;border:1px solid rgba(37,211,102,.3);
+  background:var(--wa-glow2);color:var(--wa);font-family:'JetBrains Mono',monospace;
+  font-size:.72rem;cursor:pointer;transition:all .12s;
+}
+.var-chip:hover{background:var(--wa-glow);box-shadow:0 0 8px var(--wa-glow)}
+
+.editor-main{display:grid;grid-template-columns:1fr 1fr;min-height:280px}
+.editor-pane{border-right:1px solid var(--border)}
+.editor-pane-head{
+  padding:8px 14px;background:var(--card3);border-bottom:1px solid var(--border);
+  font-size:.68rem;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.char-count{font-size:.68rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+#msgTemplate{
+  width:100%;border:none;border-radius:0;background:transparent;
+  padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:.82rem;
+  line-height:1.8;color:var(--text);resize:none;outline:none;height:260px;
+}
+#msgTemplate:focus{box-shadow:none;border:none}
+
+/* Preview pane */
+.preview-pane{background:#0b1f14;display:flex;flex-direction:column}
+.preview-bg{
+  flex:1;padding:14px 16px;overflow-y:auto;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 0h60v60H0z' fill='%230b1f14'/%3E%3Cpath d='M30 10c11 0 20 9 20 20s-9 20-20 20S10 41 10 30s9-20 20-20zm0 2c-9.9 0-18 8.1-18 18s8.1 18 18 18 18-8.1 18-18S39.9 12 30 12z' fill='%230f2518' fill-opacity='.4'/%3E%3C/svg%3E");
+}
+.wa-bubble{
+  background:#1f4b2e;border-radius:8px 8px 8px 2px;padding:8px 10px 20px;
+  max-width:88%;position:relative;font-size:.83rem;line-height:1.5;color:#e9fbe6;
+  word-break:break-word;margin-top:auto;box-shadow:0 1px 4px rgba(0,0,0,.4);
+}
+.wa-bubble::before{
+  content:'';position:absolute;bottom:0;left:-7px;
+  border:6px solid transparent;border-right-color:#1f4b2e;border-bottom-color:#1f4b2e;
+}
+.wa-bubble .wa-time{
+  position:absolute;bottom:4px;right:8px;font-size:.62rem;color:rgba(255,255,255,.5);
+  display:flex;align-items:center;gap:3px;
+}
+.wa-bubble b{font-weight:700}
+.wa-bubble i{font-style:italic}
+.wa-bubble s{text-decoration:line-through}
+.wa-bubble code{font-family:'JetBrains Mono',monospace;font-size:.78rem;background:rgba(0,0,0,.2);padding:0 3px;border-radius:3px}
+.placeholder-hl{background:rgba(37,211,102,.25);color:var(--wa);border-radius:3px;padding:0 2px;font-family:'JetBrains Mono',monospace;font-size:.8rem}
+
+.editor-footer{
+  padding:10px 14px;border-top:1px solid var(--border);background:var(--card2);
+  display:flex;align-items:center;gap:8px;font-size:.72rem;color:var(--text3);
+}
+.tip{display:flex;align-items:center;gap:5px;background:var(--card3);padding:4px 9px;border-radius:5px;border:1px solid var(--border)}
+.tip code{font-family:'JetBrains Mono',monospace;color:var(--wa);font-size:.71rem}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ EMPTY STATE ━━━━━━━━━━━━━━━━━━━━━━━━ */
+.empty{text-align:center;padding:44px 20px;color:var(--text2)}
+.empty .ei{font-size:2rem;margin-bottom:10px;opacity:.3}
+.empty strong{font-size:.9rem;color:var(--text2)}
+.empty p{font-size:.78rem;color:var(--text3);margin-top:5px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ PROGRESS ━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+.progress-row{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:.72rem;color:var(--text2)}
+.prog-bar{flex:1;height:4px;background:var(--border);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:var(--wa);border-radius:4px;transition:width .5s ease}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ DIVIDER ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SCROLLBAR ━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TOAST ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#toast{
+  position:fixed;bottom:22px;right:22px;background:var(--card);
+  border:1px solid var(--border2);color:var(--text);padding:10px 16px;
+  border-radius:10px;font-size:.8rem;opacity:0;transform:translateY(6px);
+  transition:all .22s;pointer-events:none;z-index:999;display:flex;
+  align-items:center;gap:8px;max-width:320px;box-shadow:var(--sh);
+}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok{border-color:rgba(37,211,102,.4);color:var(--wa)}
+#toast.err{border-color:rgba(239,68,68,.4);color:var(--red)}
+#toast.warn{border-color:rgba(245,158,11,.4);color:var(--yellow)}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ RESPONSIVE ━━━━━━━━━━━━━━━━━━━━━━━━━ */
+@media(max-width:1100px){.col2,.col2b{grid-template-columns:1fr}}
+@media(max-width:900px){.stats{grid-template-columns:1fr 1fr};.editor-main{grid-template-columns:1fr}}
+@media(max-width:700px){.sidebar{width:56px;min-width:56px}.nav-item span:not(.ico){display:none}.logo-text{display:none}.sidebar-footer{display:none}.page{padding:16px 12px 40px}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ════════════════════════════════════ SIDEBAR ════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.504 3.58 1.383 5.063L2 22l5.063-1.371A9.956 9.956 0 0 0 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm4.96 13.89c-.207.583-1.212 1.114-1.664 1.177-.452.063-.873.3-2.941-.613-2.494-1.083-4.099-3.622-4.224-3.789-.124-.167-1.012-1.347-1.012-2.569 0-1.222.638-1.822.865-2.07.227-.247.495-.309.66-.309.165 0 .33.002.474.008.152.007.356-.058.557.425.207.497.703 1.717.765 1.841.062.124.103.268.021.433-.083.166-.124.268-.248.413-.124.144-.26.322-.372.432-.124.121-.252.253-.109.497.145.247.641 1.058 1.376 1.713.944.84 1.741 1.1 1.988 1.223.248.124.393.103.538-.062.144-.165.62-.722.785-.97.165-.247.33-.206.556-.124.227.082 1.44.679 1.688.803.247.123.412.185.474.288.062.103.062.597-.144 1.172z"/></svg>
+    </div>
+    <div class="logo-text"><strong>WhatsApp</strong><span>Bot</span></div>
+  </div>
+
+  <div class="nav-section">Menu</div>
+  <button class="nav-item active" onclick="nav('dashboard',this)"><span class="ico">⚡</span><span>Dashboard</span></button>
+  <button class="nav-item" onclick="nav('compose',this)"><span class="ico">✏️</span><span>Compose</span></button>
+  <button class="nav-item" onclick="nav('logs',this)"><span class="ico">📡</span><span>Live Logs</span></button>
+  <button class="nav-item" onclick="nav('history',this)"><span class="ico">📋</span><span>History</span><span class="nav-count" id="hBadge" style="display:none">0</span></button>
+
+  <div class="sidebar-footer">
+    <div class="bot-pill" id="sidePill"><div class="dot"></div><span id="sideStatus">Bot Idle</span></div>
+  </div>
+</aside>
+
+<!-- ════════════════════════════════════ MAIN ════════════════════════════════════ -->
+<main class="main">
+
+<!-- ─────────────────────────────── DASHBOARD ─────────────────────────────── -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div><div class="page-title">Dashboard</div><div class="page-sub">Manage contacts and run the bot</div></div>
+    <div class="hdr-actions">
+      <button class="btn btn-ghost btn-sm" onclick="nav('compose',document.querySelector('[onclick*=compose]'))">✏️ Edit Template</button>
+      <button class="btn btn-primary" id="startBtn" onclick="startBot()">▶ Start Bot</button>
+      <button class="btn btn-danger"  id="stopBtn"  onclick="stopBot()" disabled>■ Stop</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat s0"><div class="stat-lbl">Total Contacts</div><div class="stat-val" id="sTotal">0</div></div>
+    <div class="stat s1">
+      <div class="stat-lbl">Sent</div><div class="stat-val" id="sSent">0</div>
+      <div class="stat-bar"><div class="stat-fill" id="sentBar" style="width:0%"></div></div>
+    </div>
+    <div class="stat s2">
+      <div class="stat-lbl">Failed</div><div class="stat-val" id="sFailed">0</div>
+      <div class="stat-bar"><div class="stat-fill" id="failBar" style="width:0%;background:var(--red)"></div></div>
+    </div>
+    <div class="stat s3"><div class="stat-lbl">Pending</div><div class="stat-val" id="sPending">0</div></div>
+  </div>
+
+  <div class="col2">
+    <!-- Left -->
+    <div>
+      <!-- Contacts -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><span class="ico">👥</span> Contacts</div>
+          <div class="btn-group">
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer">↑ Import CSV<input type="file" accept=".csv" id="csvFile" style="display:none"/></label>
+            <button class="btn btn-ghost btn-sm" onclick="resetAll()">↺ Reset All</button>
+          </div>
+        </div>
+        <div class="card-body p0">
+          <div class="fbar">
+            <input type="text" id="contactSearch" placeholder="Search name or phone…" oninput="renderContacts()"/>
+          </div>
+          <div class="tbl-wrap">
+            <div class="empty" id="emptyContacts"><div class="ei">👤</div><strong>No contacts yet</strong><p>Add below or import a CSV</p></div>
+            <table class="tbl" id="cTable" style="display:none">
+              <thead><tr><th>Name</th><th>Phone</th><th>Status</th><th>Sent At</th><th></th></tr></thead>
+              <tbody id="cBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add contact -->
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="ico">➕</span> Add Contact</div></div>
+        <div class="card-body">
+          <div class="row2">
+            <div class="field"><label>Name</label><input type="text" id="aName" placeholder="John Doe"/></div>
+            <div class="field"><label>Phone (with country code)</label><input type="text" id="aPhone" placeholder="+923001234567"/></div>
+          </div>
+          <div class="field"><label>Custom Message — optional (overrides template)</label><input type="text" id="aMsg" placeholder="Leave blank to use the default template"/></div>
+          <button class="btn btn-primary" onclick="addContact()">+ Add Contact</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Quick settings -->
+      <div class="card">
+        <div class="card-head"><div class="card-title"><span class="ico">⚙️</span> Settings</div></div>
+        <div class="card-body">
+          <div class="row2">
+            <div class="field"><label>Delay between messages (sec)</label><input type="number" id="delay" value="35" min="30"/></div>
+            <div class="field"><label>WA Web load time (sec)</label><input type="number" id="waitTime" value="20" min="10"/></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mini live log -->
+      <div class="card">
+        <div class="card-head">
+          <div class="card-title"><span class="ico">📡</span> Live Log</div>
+          <div class="btn-group">
+            <button class="btn btn-ghost btn-sm" onclick="nav('logs',document.querySelector('[onclick*=logs]'))">Full View</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearLogs()">Clear</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="terminal-body fixed" id="miniLog"><div class="log-empty">Waiting for activity…</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────── COMPOSE ─────────────────────────────── -->
+<div class="page" id="page-compose">
+  <div class="page-header">
+    <div><div class="page-title">Compose & Send</div><div class="page-sub">Write your template, preview it on contacts, then send — by template list or by CSV</div></div>
+    <div class="hdr-actions">
+      <button class="btn btn-ghost btn-sm" onclick="resetTemplate()">↺ Reset</button>
+      <button class="btn btn-wa" onclick="saveTemplate()">💾 Save Template</button>
+    </div>
+  </div>
+
+  <!-- ── Send Mode Tabs ── -->
+  <div style="display:flex;gap:0;margin-bottom:18px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+    <button id="modeTabTemplate" onclick="setSendMode('template')"
+      style="flex:1;padding:13px;border:none;background:var(--wa-glow2);color:var(--wa);font-family:Inter,sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px">
+      📋 Send by Template List
+      <span style="font-size:.72rem;background:var(--wa);color:#000;padding:1px 7px;border-radius:99px" id="modeCountTemplate">0 contacts</span>
+    </button>
+    <button id="modeTabCsv" onclick="setSendMode('csv')"
+      style="flex:1;padding:13px;border:none;background:var(--card);color:var(--text2);font-family:Inter,sans-serif;font-size:.85rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+      📂 Send by CSV File
+      <span style="font-size:.72rem;background:var(--card3);color:var(--text2);padding:1px 7px;border-radius:99px" id="modeCountCsv">0 loaded</span>
+    </button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start">
+
+    <!-- Left col: Template editor -->
+    <div>
+      <div class="editor-card">
+        <div class="editor-toolbar">
+          <span style="font-size:.7rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.8px">Format:</span>
+          <button class="fmt-btn" title="Bold" onclick="wrapSel('*','*')"><b>B</b></button>
+          <button class="fmt-btn" title="Italic" onclick="wrapSel('_','_')"><i>I</i></button>
+          <button class="fmt-btn" title="Strikethrough" onclick="wrapSel('~','~')"><s>S</s></button>
+          <button class="fmt-btn" title="Monospace" onclick="wrapSel('```','```')">{ }</button>
+          <div class="toolbar-divider"></div>
+          <span style="font-size:.7rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.8px">Insert:</span>
+          <button class="var-chip" onclick="insertVar('{name}')">+name</button>
+          <button class="var-chip" onclick="insertVar('{phone}')">+phone</button>
+          <button class="var-chip" onclick="insertVar('{custom_message}')">+custom</button>
+          <span class="char-count" style="margin-left:auto" id="charCount">0 chars</span>
+        </div>
+
+        <div class="editor-main" id="editorMain">
+          <div class="editor-pane">
+            <div class="editor-pane-head"><span>Template Editor</span></div>
+            <textarea id="msgTemplate" spellcheck="false" oninput="onTemplateChange()">Hi {name}!
+
+This is an automated message. Hope you're doing well!
+
+- Your Bot</textarea>
+          </div>
+          <div class="preview-pane" id="previewPane">
+            <div class="editor-pane-head" style="background:rgba(0,0,0,.3)">
+              <span>Live Preview</span>
+              <span style="font-size:.68rem;color:var(--text3)" id="previewContactLabel">Sample values</span>
+            </div>
+            <div class="preview-bg">
+              <div class="wa-bubble">
+                <div id="bubbleText"></div>
+                <div class="wa-time">
+                  <svg width="11" height="8" viewBox="0 0 16 11" fill="rgba(255,255,255,.5)"><path d="M11.071.653a.75.75 0 0 1 1.06 1.06l-6.5 6.5a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06L5.1 6.623l5.97-5.97z"/></svg>
+                  <span id="previewTime"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <span>Formatting:</span>
+          <div class="tip"><code>*bold*</code></div>
+          <div class="tip"><code>_italic_</code></div>
+          <div class="tip"><code>~strike~</code></div>
+          <div class="tip"><code>{name}</code> → auto-replaced</div>
+        </div>
+      </div>
+
+      <!-- Settings row -->
+      <div class="card" style="margin-top:14px">
+        <div class="card-head"><div class="card-title"><span class="ico">⚙️</span> Send Settings</div></div>
+        <div class="card-body">
+          <div class="row2">
+            <div class="field"><label>Delay between messages (sec)</label><input type="number" id="cDelay" value="35" min="30"/></div>
+            <div class="field"><label>WA Web load time (sec)</label><input type="number" id="cWaitTime" value="20" min="10"/></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right col: contacts / csv panel + send button -->
+    <div style="display:flex;flex-direction:column;gap:14px">
+
+      <!-- BY TEMPLATE: contact list -->
+      <div id="panelTemplate">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><span class="ico">👥</span> Contacts <span style="font-size:.72rem;color:var(--text2);font-weight:400" id="composeContactCount"></span></div>
+            <button class="btn btn-ghost btn-sm" onclick="refreshComposeContacts()">↺ Refresh</button>
+          </div>
+          <div class="card-body p0">
+            <div class="tbl-wrap" style="max-height:320px">
+              <div class="empty" id="composeEmpty"><div class="ei">👤</div><strong>No contacts</strong><p>Add contacts on the Dashboard first</p></div>
+              <table class="tbl" id="composeCTable" style="display:none">
+                <thead><tr><th>Name</th><th>Phone</th><th>Status</th><th>Preview</th></tr></thead>
+                <tbody id="composeCBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Send by template button -->
+        <div class="card">
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:.8rem;color:var(--text2);line-height:1.6">
+              Sends the template above to every <strong style="color:var(--text)">pending</strong> contact in the list.<br/>
+              Already-sent contacts are skipped automatically.
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="sendByTemplate()">▶ Send by Template</button>
+              <button class="btn btn-danger btn-sm" onclick="stopBot()" id="composeStopBtn" disabled>■ Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BY CSV: upload + preview -->
+      <div id="panelCsv" style="display:none">
+        <div class="card">
+          <div class="card-head"><div class="card-title"><span class="ico">📂</span> Upload CSV File</div></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+            <!-- Upload zone -->
+            <label class="upload-zone" id="csvDropZone">
+              <div style="font-size:1.6rem;margin-bottom:6px">📎</div>
+              <div style="font-weight:600;font-size:.85rem">Drop CSV here or click to browse</div>
+              <div style="font-size:.72rem;color:var(--text3);margin-top:4px">Columns: name, phone, custom_message</div>
+              <input type="file" accept=".csv" id="composeCsvFile" onchange="loadCsvPreview(event)"/>
+            </label>
+            <!-- Format hint -->
+            <div style="background:var(--card3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--text2);line-height:1.8">
+              <div style="color:var(--wa);margin-bottom:4px"># CSV Format Example</div>
+              <div>name,phone,custom_message</div>
+              <div>John,+923001234567,</div>
+              <div>Alice,+14155552671,"Hey {name}!"</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CSV preview table -->
+        <div class="card" id="csvPreviewCard" style="display:none">
+          <div class="card-head">
+            <div class="card-title"><span class="ico">👁</span> CSV Preview <span style="font-size:.72rem;color:var(--text2);font-weight:400" id="csvRowCount"></span></div>
+            <button class="btn btn-ghost btn-sm" onclick="clearCsvPreview()">✕ Clear</button>
+          </div>
+          <div class="card-body p0">
+            <div class="tbl-wrap" style="max-height:260px">
+              <table class="tbl" id="csvPreviewTable">
+                <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Custom Msg</th><th>Valid</th></tr></thead>
+                <tbody id="csvPreviewBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Send by CSV button -->
+        <div class="card" id="csvSendCard" style="display:none">
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:.8rem;color:var(--text2);line-height:1.6">
+              Imports the CSV above, replaces the current contact list, then sends using the template.<br/>
+              Numbers already in history are skipped.
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="sendByCsv()">▶ Send by CSV</button>
+              <button class="btn btn-danger btn-sm" onclick="stopBot()" id="csvStopBtn" disabled>■ Stop</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Preview sample values -->
+  <div class="card" style="margin-top:14px">
+    <div class="card-head">
+      <div class="card-title"><span class="ico">🧪</span> Preview Sample Values</div>
+      <span style="font-size:.72rem;color:var(--text3)">Click a contact row above to preview their exact message</span>
+    </div>
+    <div class="card-body">
+      <div class="row3">
+        <div class="field"><label>{name}</label><input type="text" id="sName" value="John Doe" oninput="onTemplateChange()"/></div>
+        <div class="field"><label>{phone}</label><input type="text" id="sPhone" value="+923001234567" oninput="onTemplateChange()"/></div>
+        <div class="field"><label>{custom_message}</label><input type="text" id="sCustom" value="Check this out!" oninput="onTemplateChange()"/></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────── LIVE LOGS ─────────────────────────────── -->
+<div class="page" id="page-logs">
+  <div class="page-header">
+    <div><div class="page-title">Live Logs</div><div class="page-sub">Real-time bot activity stream</div></div>
+    <div class="hdr-actions">
+      <label style="font-size:.8rem;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="autoScroll" checked/> Auto-scroll
+      </label>
+      <button class="btn btn-ghost btn-sm" onclick="exportLogs()">↓ Export</button>
+      <button class="btn btn-danger btn-sm" onclick="clearLogs()">🗑 Clear</button>
+    </div>
+  </div>
+
+  <div class="terminal-wrap" style="height:calc(100vh - 200px);min-height:400px">
+    <div class="terminal-titlebar">
+      <div class="tb-dot r"></div><div class="tb-dot y"></div><div class="tb-dot g"></div>
+      <span class="terminal-label">bot@whatsapp ~ live-log</span>
+      <span style="margin-left:auto;font-size:.68rem;color:var(--text3);font-family:'JetBrains Mono',monospace" id="logCount">0 lines</span>
+    </div>
+    <div class="terminal-toolbar">
+      <span style="font-size:.72rem;color:var(--text2)">Filter:</span>
+      <div class="ftabs">
+        <button class="ftab on" data-lf="all"     onclick="setLogFilter('all',this)">All</button>
+        <button class="ftab"    data-lf="ok"      onclick="setLogFilter('ok',this)">✓ Sent</button>
+        <button class="ftab"    data-lf="err"     onclick="setLogFilter('err',this)">✗ Failed</button>
+        <button class="ftab"    data-lf="warn"    onclick="setLogFilter('warn',this)">⚠ Skipped</button>
+        <button class="ftab"    data-lf="info"    onclick="setLogFilter('info',this)">ℹ Info</button>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <div class="dot" id="sseIndicator" style="background:var(--text3)"></div>
+        <span style="font-size:.7rem;color:var(--text3)" id="sseStatus">Connecting…</span>
+      </div>
+    </div>
+    <div class="terminal-body" id="fullLog"><div class="log-empty">Waiting for activity…</div></div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────── HISTORY ─────────────────────────────── -->
+<div class="page" id="page-history">
+  <div class="page-header">
+    <div><div class="page-title">Message History</div><div class="page-sub">All sends logged to <code style="font-size:.75rem;background:var(--card2);padding:1px 6px;border-radius:4px;color:var(--wa)">logs.csv</code></div></div>
+    <div class="hdr-actions">
+      <a href="/api/history/export" class="btn btn-ghost btn-sm">↓ Export CSV</a>
+      <button class="btn btn-danger btn-sm" onclick="clearHistory()">🗑 Clear</button>
+    </div>
+  </div>
+
+  <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat s0"><div class="stat-lbl">Total Logged</div><div class="stat-val" id="hTotal">0</div></div>
+    <div class="stat s1"><div class="stat-lbl">Sent</div><div class="stat-val" id="hSent">0</div></div>
+    <div class="stat s2"><div class="stat-lbl">Failed</div><div class="stat-val" id="hFailed">0</div></div>
+    <div class="stat s4"><div class="stat-lbl">Skipped</div><div class="stat-val" id="hSkipped">0</div></div>
+  </div>
+
+  <div class="card">
+    <div class="fbar">
+      <input type="text" id="hSearch" placeholder="Search by name or phone…" oninput="renderHistory()"/>
+      <div class="ftabs">
+        <button class="ftab on" data-hf="all"     onclick="setHFilter('all',this)">All</button>
+        <button class="ftab"    data-hf="sent"    onclick="setHFilter('sent',this)">Sent</button>
+        <button class="ftab"    data-hf="failed"  onclick="setHFilter('failed',this)">Failed</button>
+        <button class="ftab"    data-hf="skipped" onclick="setHFilter('skipped',this)">Skipped</button>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="max-height:520px">
+      <div class="empty" id="hEmpty"><div class="ei">📭</div><strong>No history yet</strong><p>Run the bot to see logs here</p></div>
+      <table class="tbl" id="hTable" style="display:none">
+        <thead><tr><th>Timestamp</th><th>Name</th><th>Phone</th><th>Message Preview</th><th>Status</th><th>Note</th><th style="text-align:center;width:90px">Actions</th></tr></thead>
+        <tbody id="hBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+</div><!-- /.app -->
+
+<!-- ── Edit History Modal ─────────────────────────────────────────────────── -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;width:480px;max-width:95vw;box-shadow:var(--sh)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+      <div style="font-weight:600;font-size:1rem">✏️ Edit History Entry</div>
+      <button onclick="closeEditModal()" style="background:none;border:none;color:var(--text2);font-size:1.2rem;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <input type="hidden" id="editIdx"/>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <label style="font-size:.8rem;color:var(--text2);font-weight:500">Name
+        <input id="editName" class="inp" style="margin-top:5px;width:100%" placeholder="Contact name"/>
+      </label>
+      <label style="font-size:.8rem;color:var(--text2);font-weight:500">Phone
+        <input id="editPhone" class="inp" style="margin-top:5px;width:100%" placeholder="+1234567890"/>
+      </label>
+      <label style="font-size:.8rem;color:var(--text2);font-weight:500">Message
+        <textarea id="editMessage" class="inp" rows="3" style="margin-top:5px;width:100%;resize:vertical;font-family:inherit"></textarea>
+      </label>
+      <label style="font-size:.8rem;color:var(--text2);font-weight:500">Status
+        <select id="editStatus" class="inp" style="margin-top:5px;width:100%">
+          <option value="sent">✓ Sent</option>
+          <option value="failed">✗ Failed</option>
+          <option value="skipped">— Skipped</option>
+        </select>
+      </label>
+      <label style="font-size:.8rem;color:var(--text2);font-weight:500">Note
+        <input id="editNote" class="inp" style="margin-top:5px;width:100%" placeholder="Optional note"/>
+      </label>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:22px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditModal()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ STATE ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let contacts = [], historyEntries = [], allLogLines = [];
+let hFilter = 'all', logFilter = 'all';
+let templateSaved = localStorage.getItem('wa_template') || null;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ INIT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+window.addEventListener('DOMContentLoaded', () => {
+  if (templateSaved) document.getElementById('msgTemplate').value = templateSaved;
+  onTemplateChange();
+  setPreviewTime();
+
+  fetchContacts();
+  fetchStatus();
+  fetchHistory();
+  fetchLogsOnce();     // backfill existing logs
+  setupSSE();          // real-time from here on
+
+  setInterval(()=>{ fetchStatus(); fetchContacts(); }, 3000);
+  setInterval(fetchHistory, 6000);
+
+  document.getElementById('csvFile').addEventListener('change', uploadCSV);
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ NAVIGATION ━━━━━━━━━━━━━━━━━━━━━━━━━
+function nav(name, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='history') fetchHistory();
+  if(name==='logs')    setTimeout(()=>scrollLog(true),100);
+  if(name==='compose') { refreshComposeContacts(); onTemplateChange(); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SSE LIVE LOGS ━━━━━━━━━━━━━━━━━━━━━━
+let evtSource = null;
+function setupSSE(){
+  if(evtSource) evtSource.close();
+  evtSource = new EventSource('/api/logs/stream');
+  evtSource.onopen = ()=>{
+    document.getElementById('sseIndicator').style.background='var(--wa)';
+    document.getElementById('sseStatus').textContent='Live';
+  };
+  evtSource.onmessage = e=>{
+    const msg = JSON.parse(e.data);
+    allLogLines.push(msg);
+    appendLogLine(msg, 'fullLog');
+    appendLogLine(msg, 'miniLog');
+    document.getElementById('logCount').textContent = allLogLines.length+' lines';
+  };
+  evtSource.onerror = ()=>{
+    document.getElementById('sseIndicator').style.background='var(--red)';
+    document.getElementById('sseStatus').textContent='Reconnecting…';
+    setTimeout(setupSSE, 3000);
+  };
+}
+
+async function fetchLogsOnce(){
+  const res = await fetch('/api/logs');
+  const logs = await res.json();
+  allLogLines = logs;
+  // render all at once
+  const fb = document.getElementById('fullLog');
+  const mb = document.getElementById('miniLog');
+  fb.innerHTML = ''; mb.innerHTML = '';
+  logs.forEach(l=>{ appendLogLine(l,'fullLog',false); appendLogLine(l,'miniLog',false); });
+  document.getElementById('logCount').textContent = logs.length+' lines';
+  scrollLog(true);
+}
+
+function appendLogLine(msg, boxId, scroll=true){
+  const box = document.getElementById(boxId);
+  if(!box) return;
+  // remove empty placeholder
+  const emp = box.querySelector('.log-empty');
+  if(emp) emp.remove();
+
+  const cls = classify(msg);
+  if(logFilter!=='all' && boxId==='fullLog' && cls!==logFilter) return;
+
+  const ts = msg.match(/\[(\d{2}:\d{2}:\d{2})\]/)?.[1] || '';
+  const text = msg.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/,'');
+  const row = document.createElement('div');
+  row.className='tl '+cls;
+  row.dataset.cls=cls;
+  row.innerHTML=`<span class="tl-ts">${esc(ts)}</span><span class="tl-msg">${esc(text)}</span>`;
+  box.appendChild(row);
+  if(scroll) scrollLog(false);
+}
+
+function classify(msg){
+  const l=msg.toLowerCase();
+  if(l.includes('✓')||l.includes('done.')||l.includes('sent:')) return 'ok';
+  if(l.includes('✗')||l.includes('error')||l.includes('failed')||l.includes('invalid')) return 'err';
+  if(l.includes('skip')||l.includes('waiting')||l.includes('warn')) return 'warn';
+  if(l.includes('started')||l.includes('open http')) return 'info';
+  return 'dim';
+}
+
+function scrollLog(force=false){
+  const as = document.getElementById('autoScroll')?.checked;
+  if(force||as){
+    ['fullLog','miniLog'].forEach(id=>{
+      const b=document.getElementById(id);
+      if(b) b.scrollTop=b.scrollHeight;
+    });
+  }
+}
+
+function setLogFilter(f, btn){
+  logFilter=f;
+  document.querySelectorAll('.ftab[data-lf]').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  // re-render full log
+  const box=document.getElementById('fullLog');
+  box.innerHTML='';
+  if(!allLogLines.length){box.innerHTML='<div class="log-empty">No logs yet.</div>';return;}
+  allLogLines.forEach(l=>{
+    const cls=classify(l);
+    if(f!=='all'&&cls!==f) return;
+    const ts=l.match(/\[(\d{2}:\d{2}:\d{2})\]/)?.[1]||'';
+    const text=l.replace(/\[\d{2}:\d{2}:\d{2}\]\s*/,'');
+    const row=document.createElement('div');
+    row.className='tl '+cls;
+    row.innerHTML=`<span class="tl-ts">${esc(ts)}</span><span class="tl-msg">${esc(text)}</span>`;
+    box.appendChild(row);
+  });
+  scrollLog(true);
+}
+
+function exportLogs(){
+  const txt=allLogLines.join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/plain;charset=utf-8,'+encodeURIComponent(txt);
+  a.download='bot_logs_'+Date.now()+'.txt';
+  a.click();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ STATUS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function fetchStatus(){
+  const res=await fetch('/api/bot/status');
+  const s=await res.json();
+  document.getElementById('sTotal').textContent=s.total;
+  document.getElementById('sSent').textContent=s.sent;
+  document.getElementById('sFailed').textContent=s.failed;
+  document.getElementById('sPending').textContent=s.pending;
+
+  const pct=s.total?Math.round(s.sent/s.total*100):0;
+  const fpct=s.total?Math.round(s.failed/s.total*100):0;
+  document.getElementById('sentBar').style.width=pct+'%';
+  document.getElementById('failBar').style.width=fpct+'%';
+
+  const pill=document.getElementById('sidePill');
+  const stxt=document.getElementById('sideStatus');
+  document.getElementById('startBtn').disabled=s.running;
+  document.getElementById('stopBtn').disabled=!s.running;
+  pill.classList.toggle('running',s.running);
+  stxt.textContent=s.running?'Bot Running':'Bot Idle';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ CONTACTS ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function fetchContacts(){
+  const res=await fetch('/api/contacts');
+  contacts=await res.json();
+  renderContacts();
+}
+
+async function addContact(){
+  const name=document.getElementById('aName').value.trim();
+  const phone=document.getElementById('aPhone').value.trim();
+  const msg=document.getElementById('aMsg').value.trim();
+  if(!name||!phone){toast('Name and phone required','err');return;}
+  const res=await fetch('/api/contacts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,phone,custom_message:msg})});
+  const d=await res.json();
+  if(!d.ok){toast(d.error||'Failed','err');return;}
+  document.getElementById('aName').value='';
+  document.getElementById('aPhone').value='';
+  document.getElementById('aMsg').value='';
+  await fetchContacts();
+  toast('Contact added','ok');
+}
+
+async function deleteContact(i){
+  await fetch(`/api/contacts/${i}`,{method:'DELETE'});
+  await fetchContacts();
+  toast('Removed');
+}
+
+async function resetContact(i){
+  await fetch(`/api/contacts/${i}/reset`,{method:'POST'});
+  await fetchContacts();
+  toast('Reset');
+}
+
+async function resetAll(){
+  for(let i=0;i<contacts.length;i++) await fetch(`/api/contacts/${i}/reset`,{method:'POST'});
+  await fetchContacts();
+  toast('All statuses reset');
+}
+
+async function uploadCSV(e){
+  const file=e.target.files[0];if(!file)return;
+  const fd=new FormData();fd.append('file',file);
+  const res=await fetch('/api/contacts/upload',{method:'POST',body:fd});
+  const d=await res.json();
+  if(d.ok){contacts=d.contacts;renderContacts();toast(`Imported ${contacts.length} contacts`,'ok');}
+  else toast(d.error||'Import failed','err');
+  e.target.value='';
+}
+
+function renderContacts(){
+  const q=(document.getElementById('contactSearch')?.value||'').toLowerCase();
+  const empty=document.getElementById('emptyContacts');
+  const table=document.getElementById('cTable');
+  const tbody=document.getElementById('cBody');
+  let rows=contacts.filter(c=>!q||c.name?.toLowerCase().includes(q)||c.phone?.toLowerCase().includes(q));
+  if(!rows.length){empty.style.display='block';table.style.display='none';return;}
+  empty.style.display='none';table.style.display='table';
+  tbody.innerHTML=rows.map((c,i)=>{
+    const realIdx=contacts.indexOf(c);
+    const s=c.status||'';
+    const b=statusBadge(s||'pending');
+    const act=s==='sent'
+      ?`<button class="btn btn-ghost btn-xs" onclick="resetContact(${realIdx})">↺ Reset</button>`
+      :`<button class="btn btn-xs" style="background:transparent;border:1px solid rgba(239,68,68,.3);color:var(--red)" onclick="deleteContact(${realIdx})">✕</button>`;
+    return `<tr><td>${esc(c.name||'—')}</td><td class="mono muted">${esc(c.phone||'—')}</td><td>${b}</td><td class="mono muted" style="font-size:.7rem">${c.sent_at||'—'}</td><td>${act}</td></tr>`;
+  }).join('');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BOT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function startBot(){
+  const template=document.getElementById('msgTemplate').value;
+  const delay=parseInt(document.getElementById('delay').value);
+  const wait_time=parseInt(document.getElementById('waitTime').value);
+  const res=await fetch('/api/bot/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template,delay,wait_time})});
+  const d=await res.json();
+  if(!d.ok){toast(d.error||'Could not start','err');return;}
+  toast('Bot started!','ok');fetchStatus();
+}
+async function stopBot(){
+  await fetch('/api/bot/stop',{method:'POST'});
+  document.getElementById('composeStopBtn').disabled = true;
+  document.getElementById('csvStopBtn').disabled     = true;
+  toast('Bot stopped','warn'); fetchStatus();
+}
+async function clearLogs(){
+  await fetch('/api/logs/clear',{method:'POST'});
+  allLogLines=[];
+  ['fullLog','miniLog'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b)b.innerHTML='<div class="log-empty">Log cleared.</div>';
+  });
+  document.getElementById('logCount').textContent='0 lines';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SEND MODE ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let sendMode = 'template';
+let csvRows  = [];
+
+function setSendMode(mode) {
+  sendMode = mode;
+  const tTab = document.getElementById('modeTabTemplate');
+  const cTab = document.getElementById('modeTabCsv');
+  const tPanel = document.getElementById('panelTemplate');
+  const cPanel = document.getElementById('panelCsv');
+
+  if (mode === 'template') {
+    tTab.style.background = 'var(--wa-glow2)'; tTab.style.color = 'var(--wa)'; tTab.style.fontWeight = '600';
+    cTab.style.background = 'var(--card)';      cTab.style.color = 'var(--text2)'; cTab.style.fontWeight = '500';
+    tPanel.style.display = ''; cPanel.style.display = 'none';
+    refreshComposeContacts();
+  } else {
+    cTab.style.background = 'var(--wa-glow2)'; cTab.style.color = 'var(--wa)'; cTab.style.fontWeight = '600';
+    tTab.style.background = 'var(--card)';      tTab.style.color = 'var(--text2)'; tTab.style.fontWeight = '500';
+    cPanel.style.display = ''; tPanel.style.display = 'none';
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ COMPOSE CONTACTS ━━━━━━━━━━━━━━━━━━━━
+function refreshComposeContacts() {
+  const empty  = document.getElementById('composeEmpty');
+  const table  = document.getElementById('composeCTable');
+  const tbody  = document.getElementById('composeCBody');
+  const count  = document.getElementById('composeContactCount');
+  const badge  = document.getElementById('modeCountTemplate');
+  const pending = contacts.filter(c => (c.status||'') !== 'sent' && (c.status||'') !== 'skipped');
+
+  count.textContent = `(${contacts.length} total, ${pending.length} pending)`;
+  badge.textContent = `${pending.length} contacts`;
+
+  if (!contacts.length) {
+    empty.style.display = 'block'; table.style.display = 'none'; return;
+  }
+  empty.style.display = 'none'; table.style.display = 'table';
+
+  const tmpl = document.getElementById('msgTemplate').value;
+  tbody.innerHTML = contacts.map(c => {
+    const msg = renderMsg(tmpl, c).slice(0, 40) + (renderMsg(tmpl, c).length > 40 ? '…' : '');
+    const s = c.status || '';
+    return `<tr style="cursor:pointer" onclick="previewContact('${esc(c.name||'')}','${esc(c.phone||'')}','${esc(c.custom_message||'')}')">
+      <td>${esc(c.name||'—')}</td>
+      <td class="mono muted" style="font-size:.72rem">${esc(c.phone||'—')}</td>
+      <td>${statusBadge(s||'pending')}</td>
+      <td class="muted" style="font-size:.75rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(msg)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function previewContact(name, phone, custom) {
+  document.getElementById('sName').value   = name  || 'John Doe';
+  document.getElementById('sPhone').value  = phone || '+923001234567';
+  document.getElementById('sCustom').value = custom|| 'Check this out!';
+  document.getElementById('previewContactLabel').textContent = `Previewing: ${name}`;
+  onTemplateChange();
+}
+
+function renderMsg(tmpl, contact) {
+  return tmpl
+    .replace(/\{name\}/g,           contact.name           || '')
+    .replace(/\{phone\}/g,          contact.phone          || '')
+    .replace(/\{custom_message\}/g, contact.custom_message || '');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ CSV PREVIEW ━━━━━━━━━━━━━━━━━━━━━━━━━
+function loadCsvPreview(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,''));
+    csvRows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g,''));
+      const row = {};
+      headers.forEach((h, idx) => row[h] = vals[idx] || '');
+      if (row.phone) csvRows.push(row);
+    }
+    renderCsvPreview();
+    document.getElementById('modeCountCsv').textContent = csvRows.length + ' loaded';
+  };
+  reader.readAsText(file);
+}
+
+function renderCsvPreview() {
+  const card  = document.getElementById('csvPreviewCard');
+  const send  = document.getElementById('csvSendCard');
+  const tbody = document.getElementById('csvPreviewBody');
+  const count = document.getElementById('csvRowCount');
+  if (!csvRows.length) { card.style.display='none'; send.style.display='none'; return; }
+  card.style.display = ''; send.style.display = '';
+  count.textContent = `(${csvRows.length} rows)`;
+  tbody.innerHTML = csvRows.map((r, i) => {
+    const phone = (r.phone||'').replace(/\s/g,'');
+    const digits = phone.replace(/\D/g,'');
+    const valid = digits.length >= 10 && digits.length <= 15;
+    return `<tr>
+      <td class="muted">${i+1}</td>
+      <td>${esc(r.name||'—')}</td>
+      <td class="mono" style="font-size:.72rem">${esc(r.phone||'—')}</td>
+      <td class="muted" style="font-size:.75rem;max-width:160px">${esc((r.custom_message||'').slice(0,50)||'— use template')}</td>
+      <td>${valid ? '<span class="badge b-sent">✓</span>' : '<span class="badge b-failed">✗ Short</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearCsvPreview() {
+  csvRows = [];
+  document.getElementById('csvPreviewCard').style.display = 'none';
+  document.getElementById('csvSendCard').style.display    = 'none';
+  document.getElementById('composeCsvFile').value = '';
+  document.getElementById('modeCountCsv').textContent = '0 loaded';
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ SEND ACTIONS ━━━━━━━━━━━━━━━━━━━━━━━━
+async function sendByTemplate() {
+  const template  = document.getElementById('msgTemplate').value;
+  const delay     = parseInt(document.getElementById('cDelay').value);
+  const wait_time = parseInt(document.getElementById('cWaitTime').value);
+  if (!contacts.length) { toast('No contacts — add them on Dashboard first', 'err'); return; }
+  const res  = await fetch('/api/bot/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({template, delay, wait_time, mode: 'template'}),
+  });
+  const d = await res.json();
+  if (!d.ok) { toast(d.error || 'Could not start', 'err'); return; }
+  document.getElementById('composeStopBtn').disabled = false;
+  toast('Bot started — sending your template to all contacts!', 'ok');
+  fetchStatus();
+}
+
+async function sendByCsv() {
+  if (!csvRows.length) { toast('No CSV loaded', 'err'); return; }
+  const template  = document.getElementById('msgTemplate').value;
+  const delay     = parseInt(document.getElementById('cDelay').value);
+  const wait_time = parseInt(document.getElementById('cWaitTime').value);
+
+  // Upload the CSV rows as the contact list first
+  const csvStr = 'name,phone,custom_message\n' +
+    csvRows.map(r => `${r.name||''},${r.phone||''},${r.custom_message||''}`).join('\n');
+  const blob = new Blob([csvStr], {type:'text/csv'});
+  const fd = new FormData(); fd.append('file', blob, 'import.csv');
+  const up = await fetch('/api/contacts/upload', {method:'POST', body:fd});
+  const ud = await up.json();
+  if (!ud.ok) { toast('Failed to import CSV', 'err'); return; }
+  contacts = ud.contacts;
+  refreshComposeContacts();
+  toast(`Imported ${contacts.length} contacts`, 'ok');
+
+  // Now start the bot — CSV mode uses per-contact custom_message (falls back to template)
+  const res = await fetch('/api/bot/start', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({template, delay, wait_time, mode: 'csv'}),
+  });
+  const d = await res.json();
+  if (!d.ok) { toast(d.error || 'Could not start', 'err'); return; }
+  document.getElementById('csvStopBtn').disabled = false;
+  toast('Bot started — sending per-contact messages from CSV!', 'ok');
+  fetchStatus();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ TEMPLATE EDITOR ━━━━━━━━━━━━━━━━━━━━
+function onTemplateChange(){
+  const raw=document.getElementById('msgTemplate').value;
+  document.getElementById('charCount').textContent=raw.length+' chars';
+  updatePreview(raw);
+  if (sendMode==='template') refreshComposeContacts();
+}
+
+function updatePreview(raw){
+  const sName=document.getElementById('sName')?.value||'John Doe';
+  const sPhone=document.getElementById('sPhone')?.value||'+923001234567';
+  const sCustom=document.getElementById('sCustom')?.value||'Check this out!';
+  let rendered=raw
+    .replace(/\{name\}/g,sName).replace(/\{phone\}/g,sPhone).replace(/\{custom_message\}/g,sCustom);
+  rendered=rendered
+    .replace(/```([\s\S]*?)```/g,'<code>$1</code>')
+    .replace(/\*([^*\n]+)\*/g,'<b>$1</b>')
+    .replace(/_([^_\n]+)_/g,'<i>$1</i>')
+    .replace(/~([^~\n]+)~/g,'<s>$1</s>')
+    .replace(/\n/g,'<br/>');
+  document.getElementById('bubbleText').innerHTML=rendered;
+}
+
+function wrapSel(before,after){
+  const ta=document.getElementById('msgTemplate');
+  const s=ta.selectionStart,e=ta.selectionEnd;
+  const sel=ta.value.slice(s,e)||'text';
+  ta.value=ta.value.slice(0,s)+before+sel+after+ta.value.slice(e);
+  ta.selectionStart=s+before.length; ta.selectionEnd=s+before.length+sel.length;
+  ta.focus(); onTemplateChange();
+}
+
+function insertVar(v){
+  const ta=document.getElementById('msgTemplate');
+  const s=ta.selectionStart;
+  ta.value=ta.value.slice(0,s)+v+ta.value.slice(s);
+  ta.selectionStart=ta.selectionEnd=s+v.length;
+  ta.focus(); onTemplateChange();
+}
+
+function setPreviewTime(){
+  const n=new Date();
+  document.getElementById('previewTime').textContent=
+    n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
+}
+
+function saveTemplate(){
+  localStorage.setItem('wa_template', document.getElementById('msgTemplate').value);
+  // Sync delay/waitTime from compose to dashboard inputs
+  document.getElementById('delay').value    = document.getElementById('cDelay').value;
+  document.getElementById('waitTime').value = document.getElementById('cWaitTime').value;
+  toast('Template saved!','ok');
+}
+
+function resetTemplate(){
+  const def=`Hi {name}!\n\nThis is an automated message. Hope you're doing well!\n\n- Your Bot`;
+  document.getElementById('msgTemplate').value=def;
+  localStorage.removeItem('wa_template');
+  onTemplateChange(); toast('Template reset');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ HISTORY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function fetchHistory(){
+  const res=await fetch('/api/history');
+  historyEntries=await res.json();
+  const s=historyEntries.filter(e=>e.status==='sent').length;
+  const f=historyEntries.filter(e=>e.status==='failed').length;
+  const sk=historyEntries.filter(e=>e.status==='skipped').length;
+  document.getElementById('hTotal').textContent=historyEntries.length;
+  document.getElementById('hSent').textContent=s;
+  document.getElementById('hFailed').textContent=f;
+  document.getElementById('hSkipped').textContent=sk;
+  const b=document.getElementById('hBadge');
+  if(historyEntries.length){b.style.display='';b.textContent=historyEntries.length>99?'99+':historyEntries.length;}
+  else b.style.display='none';
+  renderHistory();
+}
+
+function setHFilter(f,btn){
+  hFilter=f;
+  document.querySelectorAll('.ftab[data-hf]').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  renderHistory();
+}
+
+function renderHistory(){
+  const q=(document.getElementById('hSearch')?.value||'').toLowerCase();
+  let rows=historyEntries;
+  if(hFilter!=='all') rows=rows.filter(e=>e.status===hFilter);
+  if(q) rows=rows.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.phone||'').toLowerCase().includes(q));
+  const empty=document.getElementById('hEmpty');
+  const table=document.getElementById('hTable');
+  const tbody=document.getElementById('hBody');
+  if(!rows.length){empty.style.display='block';table.style.display='none';return;}
+  empty.style.display='none';table.style.display='table';
+  tbody.innerHTML=rows.map(e=>{
+    const mp=(e.message||'').slice(0,60)+((e.message||'').length>60?'…':'');
+    const note=e.note?`<span style="color:var(--yellow);font-size:.7rem">${esc(e.note)}</span>`:'<span class="muted">—</span>';
+    const id=e._id;
+    return `<tr>
+      <td class="mono muted" style="font-size:.68rem;white-space:nowrap">${esc(e.timestamp||'')}</td>
+      <td>${esc(e.name||'—')}</td>
+      <td class="mono muted">${esc(e.phone||'—')}</td>
+      <td class="muted" style="max-width:200px;font-size:.77rem">${esc(mp)||'—'}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td style="max-width:180px">${note}</td>
+      <td style="text-align:center;white-space:nowrap">
+        <button onclick="openEditModal(${id})" title="Edit" style="background:var(--card3);border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:.75rem;margin-right:4px" onmouseover="this.style.color='var(--wa)'" onmouseout="this.style.color='var(--text2)'">✏️</button>
+        <button onclick="deleteHistoryRow(${id})" title="Delete" style="background:var(--red-bg);border:1px solid var(--red);color:var(--red);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:.75rem" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='var(--red-bg)';this.style.color='var(--red)'">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteHistoryRow(id){
+  if(!confirm('Delete this log entry?')) return;
+  const res=await fetch(`/api/history/${id}`,{method:'DELETE'});
+  const d=await res.json();
+  if(d.ok){ toast('Entry deleted','warn'); fetchHistory(); }
+  else toast(d.error||'Delete failed','err');
+}
+
+function openEditModal(id){
+  const e=historyEntries.find(x=>x._id===id);
+  if(!e) return;
+  document.getElementById('editIdx').value=id;
+  document.getElementById('editName').value=e.name||'';
+  document.getElementById('editPhone').value=e.phone||'';
+  document.getElementById('editMessage').value=e.message||'';
+  document.getElementById('editStatus').value=e.status||'sent';
+  document.getElementById('editNote').value=e.note||'';
+  const modal=document.getElementById('editModal');
+  modal.style.display='flex';
+}
+
+function closeEditModal(){
+  document.getElementById('editModal').style.display='none';
+}
+
+async function saveEditModal(){
+  const id=parseInt(document.getElementById('editIdx').value);
+  const payload={
+    name:    document.getElementById('editName').value,
+    phone:   document.getElementById('editPhone').value,
+    message: document.getElementById('editMessage').value,
+    status:  document.getElementById('editStatus').value,
+    note:    document.getElementById('editNote').value,
+  };
+  const res=await fetch(`/api/history/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d=await res.json();
+  if(d.ok){ toast('Entry updated','ok'); closeEditModal(); fetchHistory(); }
+  else toast(d.error||'Update failed','err');
+}
+
+// Close modal when clicking the backdrop
+document.getElementById('editModal').addEventListener('click',function(e){
+  if(e.target===this) closeEditModal();
+});
+
+async function clearHistory(){
+  if(!confirm('Clear all message history? This cannot be undone.')) return;
+  await fetch('/api/history/clear',{method:'POST'});
+  historyEntries=[];renderHistory();fetchHistory();
+  toast('History cleared','warn');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ UTILS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function statusBadge(s){
+  const m={sent:['b-sent','✓ Sent'],failed:['b-failed','✗ Failed'],skipped:['b-skip','— Skipped'],pending:['b-pend','· Pending']};
+  const [cls,lbl]=m[s]||['b-none',s||'—'];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+let _tt;
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  const icons={ok:'✓',err:'✗',warn:'⚠'};
+  t.innerHTML=(icons[type]?`<span>${icons[type]}</span>`:'')+esc(msg);
+  t.className='show '+(type||'');
+  clearTimeout(_tt);
+  _tt=setTimeout(()=>t.className='',3200);
+}
+</script>
+</body>
+</html>
