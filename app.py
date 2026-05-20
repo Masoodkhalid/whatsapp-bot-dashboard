@@ -292,7 +292,17 @@ end tell
         capture_output=True, text=True, timeout=15
     )
     if nav.returncode != 0:
-        return False, f"AppleScript error: {nav.stderr.strip()[:200]}"
+        err = nav.stderr.strip()
+        if "-1743" in err or "Not authorized" in err:
+            msg = (
+                "PERMISSION DENIED (-1743) — macOS is blocking Python from controlling Chrome. "
+                "Fix: System Settings → Privacy & Security → Automation → "
+                "find Terminal (or Python) → enable Google Chrome. "
+                "Then restart the bot."
+            )
+            push_log(f"⛔ {msg}")
+            return False, msg
+        return False, f"AppleScript error: {err[:200]}"
 
     # ── Step 2: wait for WhatsApp to load the chat ────────────────────────────
     push_log(f"  ↳ WhatsApp tab navigating… waiting {wait_time}s for chat to load")
@@ -311,7 +321,11 @@ end tell
         capture_output=True, text=True, timeout=8
     )
     if send.returncode != 0:
-        return False, f"Could not press Enter: {send.stderr.strip()[:200]}"
+        err = send.stderr.strip()
+        if "-1743" in err or "Not authorized" in err:
+            push_log("⛔ Permission denied for System Events. Fix: System Settings → Privacy & Security → Automation → Terminal → enable Google Chrome.")
+            return False, "Permission denied — see instructions above"
+        return False, f"Could not press Enter: {err[:200]}"
 
     time.sleep(1)
     return True, ""
@@ -595,6 +609,19 @@ def start_bot():
     )
     bot_thread.start()
     return jsonify({"ok": True})
+
+
+@app.route("/api/fix-permissions", methods=["POST"])
+def fix_permissions():
+    """Open macOS System Settings → Privacy → Automation so user can grant Chrome access."""
+    try:
+        subprocess.Popen([
+            "open",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+        ])
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/chrome-mode", methods=["GET"])

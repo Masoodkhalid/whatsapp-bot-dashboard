@@ -743,6 +743,21 @@ This is an automated message. Hope you're doing well!
   </div>
 </div>
 
+<!-- ── macOS Permission Banner ──────────────────────────────────────────────── -->
+<div id="permBanner" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:998;background:#1a1a1e;border:1px solid var(--red);border-radius:var(--radius);padding:16px 22px;box-shadow:0 8px 32px rgba(0,0,0,.6);max-width:540px;width:90vw">
+  <div style="font-weight:600;color:var(--red);margin-bottom:6px">⛔ macOS Permission Required</div>
+  <div style="font-size:.82rem;color:var(--text2);margin-bottom:14px;line-height:1.6">
+    Python is not allowed to control Chrome.<br>
+    Click the button below — it opens the exact settings page.<br>
+    Then enable <strong style="color:var(--text)">Google Chrome</strong> under <strong style="color:var(--text)">Terminal</strong> or <strong style="color:var(--text)">Python</strong>.
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button class="btn btn-danger btn-sm" onclick="fixPermissions()">🔐 Open Privacy Settings</button>
+    <span style="font-size:.75rem;color:var(--text3)">System Settings → Privacy & Security → Automation</span>
+    <button onclick="document.getElementById('permBanner').style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:1rem">✕</button>
+  </div>
+</div>
+
 </main>
 </div><!-- /.app -->
 
@@ -835,6 +850,7 @@ function setupSSE(){
     appendLogLine(msg, 'fullLog');
     appendLogLine(msg, 'miniLog');
     document.getElementById('logCount').textContent = allLogLines.length+' lines';
+    checkForPermissionError(msg);  // show fix banner if macOS permission error
   };
   evtSource.onerror = ()=>{
     document.getElementById('sseIndicator').style.background='var(--red)';
@@ -1016,6 +1032,17 @@ function renderContacts(){
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BOT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function fixPermissions(){
+  await fetch('/api/fix-permissions', {method:'POST'});
+  toast('System Settings opened → find Terminal or Python → enable Google Chrome → restart bot', 'warn');
+}
+
+function checkForPermissionError(msg){
+  if(msg && (msg.includes('-1743') || msg.includes('Not authorized') || msg.includes('PERMISSION DENIED'))){
+    document.getElementById('permBanner').style.display = 'block';
+  }
+}
+
 async function checkChromeMode(){
   try{
     const res = await fetch('/api/chrome-mode');
