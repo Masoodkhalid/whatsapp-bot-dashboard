@@ -7,6 +7,8 @@ import csv
 import io
 import json
 import logging
+import platform
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -48,7 +50,28 @@ _driver: webdriver.Chrome | None = None
 
 # ── Chrome helpers ─────────────────────────────────────────────────────────────
 
-def _build_driver() -> webdriver.Chrome:
+CHROME_DEBUG_PORT = 9222   # port used when Chrome is launched via launch_chrome script
+
+
+def _try_connect_existing_chrome() -> webdriver.Chrome | None:
+    """
+    Try to attach Selenium to the user's already-running Chrome
+    (only works if Chrome was started with --remote-debugging-port=9222).
+    Returns a driver on success, None if Chrome isn't listening.
+    """
+    try:
+        opts = ChromeOptions()
+        opts.add_experimental_option("debuggerAddress", f"localhost:{CHROME_DEBUG_PORT}")
+        service = ChromeService(ChromeDriverManager().install())
+        driver  = webdriver.Chrome(service=service, options=opts)
+        _       = driver.window_handles   # raises immediately if port closed
+        return driver
+    except Exception:
+        return None
+
+
+def _build_own_driver() -> webdriver.Chrome:
+    """Launch the bot's own dedicated Chrome using wa_profile (fallback)."""
     WA_PROFILE_DIR.mkdir(exist_ok=True)
     opts = ChromeOptions()
     opts.add_argument(f"--user-data-dir={WA_PROFILE_DIR}")
@@ -59,7 +82,7 @@ def _build_driver() -> webdriver.Chrome:
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
     service = ChromeService(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=opts)
+    driver  = webdriver.Chrome(service=service, options=opts)
     driver.maximize_window()
     return driver
 
@@ -95,10 +118,25 @@ def get_driver() -> webdriver.Chrome:
         except Exception:
             close_driver()
 
-    push_log("Opening WhatsApp Web in Chrome…")
-    _driver = _build_driver()
+    # ── 1. Try attaching to the user's existing Chrome ──────────────────────
+    push_log("Connecting to Chrome…")
+    driver = _try_connect_existing_chrome()
+    if driver:
+        _driver = driver
+        push_log("✓ Connected to YOUR existing Chrome browser.")
+        if not _is_logged_in(_driver):
+            _wait_for_login(_driver)
+        else:
+            push_log("✓ WhatsApp already open — ready to send!")
+        return _driver
+
+    # ── 2. Fallback: open bot's own Chrome window ────────────────────────────
+    push_log("⚠ Could not connect to your Chrome.")
+    push_log("💡 TIP: Use 'Launch Chrome for Bot' button on the Dashboard to avoid this.")
+    push_log("Opening bot's own Chrome window instead…")
+    _driver = _build_own_driver()
     _driver.get("https://web.whatsapp.com")
-    time.sleep(5)   # let page load
+    time.sleep(5)
 
     if not _is_logged_in(_driver):
         _wait_for_login(_driver)
@@ -442,6 +480,42 @@ def start_bot():
     )
     bot_thread.start()
     return jsonify({"ok": True})
+
+
+@app.route("/api/launch-chrome", methods=["POST"])
+def launch_chrome():
+    """
+    Kill any existing Chrome and relaunch it with --remote-debugging-port=9222
+    so the bot can attach to the user's own browser session.
+    """
+    system = platform.system()
+    try:
+        if system == "Darwin":   # macOS
+            subprocess.Popen(["pkill", "-a", "-i", "Google Chrome"], stderr=subprocess.DEVNULL)
+            time.sleep(2)
+            subprocess.Popen([
+                "open", "-a", "Google Chrome",
+                "--args", f"--remote-debugging-port={CHROME_DEBUG_PORT}"
+            ])
+        elif system == "Windows":
+            subprocess.Popen("taskkill /F /IM chrome.exe", shell=True, stderr=subprocess.DEVNULL)
+            time.sleep(2)
+            chrome_paths = [
+                r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            ]
+            chrome_exe = next((p for p in chrome_paths if Path(p).exists()), None)
+            if not chrome_exe:
+                return jsonify({"ok": False, "error": "Chrome not found. Install Chrome first."})
+            subprocess.Popen([chrome_exe, f"--remote-debugging-port={CHROME_DEBUG_PORT}"])
+        else:
+            return jsonify({"ok": False, "error": f"Unsupported OS: {system}"})
+
+        push_log(f"✓ Chrome launched with remote debugging on port {CHROME_DEBUG_PORT}.")
+        push_log("💡 Your WhatsApp session is already there — no QR scan needed!")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/api/bot/stop", methods=["POST"])

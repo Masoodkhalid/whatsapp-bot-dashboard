@@ -381,6 +381,7 @@ hr{border:none;border-top:1px solid var(--border);margin:16px 0}
     <div><div class="page-title">Dashboard</div><div class="page-sub">Manage contacts and run the bot</div></div>
     <div class="hdr-actions">
       <button class="btn btn-ghost btn-sm" onclick="nav('compose',document.querySelector('[onclick*=compose]'))">✏️ Edit Template</button>
+      <button class="btn btn-ghost btn-sm" id="launchChromeBtn" onclick="launchChrome()" title="Closes Chrome and relaunches it connected to this bot — no QR scan needed!">🔌 Launch Chrome for Bot</button>
       <button class="btn btn-primary" id="startBtn" onclick="startBot()">▶ Start Bot</button>
       <button class="btn btn-danger"  id="stopBtn"  onclick="stopBot()" disabled>■ Stop</button>
     </div>
@@ -1014,6 +1015,23 @@ function renderContacts(){
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ BOT ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function launchChrome(){
+  const btn = document.getElementById('launchChromeBtn');
+  if(!confirm('This will close your current Chrome and reopen it connected to the bot.\n\nYour WhatsApp session will already be there — no QR scan needed.\n\nProceed?')) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Launching…';
+  const res = await fetch('/api/launch-chrome', {method:'POST'});
+  const d   = await res.json();
+  btn.disabled = false;
+  btn.textContent = '🔌 Launch Chrome for Bot';
+  if(d.ok){
+    toast('✓ Chrome launched! WhatsApp should open automatically.', 'ok');
+    nav('logs', document.querySelector('[onclick*=logs]'));
+  } else {
+    toast(d.error || 'Failed to launch Chrome', 'err');
+  }
+}
+
 async function startBot(){
   const template=document.getElementById('msgTemplate').value;
   const delay=parseInt(document.getElementById('delay').value);
