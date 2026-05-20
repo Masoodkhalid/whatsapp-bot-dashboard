@@ -46,8 +46,8 @@ Download from **https://www.google.com/chrome/** and install normally.
 ### Step 3 — Download the Project
 Clone via Git:
 ```bash
-git clone https://github.com/YOUR_USERNAME/whatsapp-bot.git
-cd whatsapp-bot
+git clone https://github.com/Masoodkhalid/whatsapp-bot-dashboard.git
+cd whatsapp-bot-dashboard
 ```
 Or download the ZIP from GitHub → Extract → open Terminal in that folder.
 
@@ -94,8 +94,8 @@ Download from **https://www.google.com/chrome/** and install normally.
 ### Step 3 — Download the Project
 Clone via Git (install Git from **https://git-scm.com** if needed):
 ```cmd
-git clone https://github.com/YOUR_USERNAME/whatsapp-bot.git
-cd whatsapp-bot
+git clone https://github.com/Masoodkhalid/whatsapp-bot-dashboard.git
+cd whatsapp-bot-dashboard
 ```
 Or download the ZIP from GitHub → Extract → open Command Prompt in that folder:
 ```cmd
