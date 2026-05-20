@@ -272,20 +272,33 @@ def _send_via_open_cmd(phone: str, message: str, wait_time: int) -> tuple[bool, 
     push_log(f"  ↳ Opening WhatsApp chat… waiting {wait_time}s for message to load")
     time.sleep(wait_time)
 
-    # ── Step 3 + 4: bring Chrome to front, then press Enter ───────────────────
-    # 'open -a' activates Chrome without Apple Events → no Chrome permission.
-    # System Events keystroke only → iTerm already has this permission.
-    subprocess.Popen(["open", "-a", "Google Chrome"])
-    time.sleep(0.8)
-
-    enter_script = 'tell application "System Events" to keystroke return'
+    # ── Step 3: bring Chrome to front + move focus from URL bar to page ────────
+    # Uses System Events process control (Accessibility API, not Apple Events)
+    # so NO Chrome Automation permission is needed — only System Events which
+    # is already permitted for iTerm.
+    focus_script = '''
+tell application "System Events"
+    tell process "Google Chrome"
+        set frontmost to true
+    end tell
+    delay 0.4
+    -- Cmd+L focuses the URL bar; Escape then returns focus to the page.
+    -- This reliably puts keyboard focus onto the WhatsApp message input.
+    keystroke "l" using command down
+    delay 0.25
+    key code 53
+    delay 0.35
+    -- Now the WhatsApp message input has focus → Enter sends the message.
+    key code 36
+end tell
+'''
     result = subprocess.run(
-        ["osascript", "-e", enter_script],
-        capture_output=True, text=True, timeout=8
+        ["osascript", "-e", focus_script],
+        capture_output=True, text=True, timeout=12
     )
     if result.returncode != 0:
         err = result.stderr.strip()
-        return False, f"Could not press Enter: {err[:150]}"
+        return False, f"Could not send message: {err[:150]}"
 
     time.sleep(1)
     return True, ""
