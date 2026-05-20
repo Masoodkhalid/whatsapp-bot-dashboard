@@ -144,12 +144,13 @@ def get_driver() -> webdriver.Chrome:
         except Exception:
             close_driver()
 
-    # ── 1. Try the user's own Chrome (debug port must be open) ───────────────
     push_log("Connecting to Chrome…")
+
+    # ── 1. Try attaching to the user's existing Chrome via debug port ─────────
     driver = _connect_to_existing_chrome()
     if driver:
         _driver = driver
-        push_log("✓ Connected to YOUR Chrome — no new window opened.")
+        push_log("✓ Connected to YOUR existing Chrome — no new window opened.")
         _ensure_whatsapp_tab(_driver)
         if not _is_logged_in(_driver):
             _wait_for_login(_driver)
@@ -157,17 +158,17 @@ def get_driver() -> webdriver.Chrome:
             push_log("✓ WhatsApp already logged in — ready to send!")
         return _driver
 
-    # ── 2. Fallback: bot's own Chrome ────────────────────────────────────────
-    push_log("⚠ Could not connect to your Chrome.")
-    push_log("💡 Click 'Launch Chrome for Bot' on the Dashboard first, then start the bot.")
-    push_log("Opening bot's own Chrome window as fallback…")
+    # ── 2. Fallback: bot's own Chrome using wa_profile ────────────────────────
+    push_log("⚠ Your Chrome is not in bot-connect mode.")
+    push_log("💡 Click '🔌 Launch Chrome for Bot' on the Dashboard to use YOUR Chrome next time.")
+    push_log("Opening bot's own Chrome window for now…")
     _driver = _build_own_driver()
     _driver.get("https://web.whatsapp.com")
     time.sleep(5)
     if not _is_logged_in(_driver):
         _wait_for_login(_driver)
     else:
-        push_log("✓ WhatsApp session restored — ready.")
+        push_log("✓ WhatsApp session restored — ready to send!")
     return _driver
 
 
@@ -272,36 +273,29 @@ def _send_via_open_cmd(phone: str, message: str, wait_time: int) -> tuple[bool, 
     push_log(f"  ↳ Opening WhatsApp chat… waiting {wait_time}s for message to load")
     time.sleep(wait_time)
 
-    # ── Step 3: bring Chrome to front + move focus from URL bar to page ────────
-    # Uses System Events process control (Accessibility API, not Apple Events)
-    # so NO Chrome Automation permission is needed — only System Events which
-    # is already permitted for iTerm.
-    focus_script = '''
-tell application "System Events"
-    tell process "Google Chrome"
-        set frontmost to true
-    end tell
-    delay 0.4
-    -- Cmd+L focuses the URL bar; Escape then returns focus to the page.
-    -- This reliably puts keyboard focus onto the WhatsApp message input.
-    keystroke "l" using command down
-    delay 0.25
-    key code 53
-    delay 0.35
-    -- Now the WhatsApp message input has focus → Enter sends the message.
-    key code 36
-end tell
-'''
-    result = subprocess.run(
-        ["osascript", "-e", focus_script],
-        capture_output=True, text=True, timeout=12
-    )
-    if result.returncode != 0:
-        err = result.stderr.strip()
-        return False, f"Could not send message: {err[:150]}"
+    # ── Step 3: bring Chrome to front ─────────────────────────────────────────
+    subprocess.Popen(["open", "-a", "Google Chrome"])
+    time.sleep(0.8)
 
-    time.sleep(1)
-    return True, ""
+    # ── Step 4: press Enter via pynput (CGEvent — no osascript, no Automation)─
+    # pynput uses macOS CoreGraphics API. First run will show an Accessibility
+    # permission dialog — click OK once and it never asks again.
+    try:
+        from pynput.keyboard import Key, Controller as KB
+        kb = KB()
+        # Cmd+L → focus URL bar, Escape → return focus to WhatsApp input, Enter → send
+        kb.press(Key.cmd); kb.press('l'); kb.release('l'); kb.release(Key.cmd)
+        time.sleep(0.25)
+        kb.press(Key.esc); kb.release(Key.esc)
+        time.sleep(0.35)
+        kb.press(Key.enter); kb.release(Key.enter)
+        time.sleep(1)
+        return True, ""
+    except Exception as e:
+        err = str(e)
+        push_log(f"⛔ Keyboard error: {err[:200]}")
+        push_log("💡 Fix: System Settings → Privacy & Security → Accessibility → enable iTerm")
+        return False, f"Keyboard error: {err[:150]}"
 
 
 def send_one(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
@@ -310,11 +304,7 @@ def send_one(phone: str, message: str, wait_time: int) -> tuple[bool, str]:
     macOS → uses AppleScript to control your existing Chrome (no restart needed).
     Other OS → uses Selenium (requires 'Launch Chrome for Bot' one-time setup).
     """
-    # ── macOS: open command + System Events — no Chrome Automation permission ──
-    if platform.system() == "Darwin":
-        return _send_via_open_cmd(phone, message, wait_time)
-
-    # ── Windows / Linux: Selenium path ────────────────────────────────────────
+    # ── Selenium (works on all platforms) ─────────────────────────────────────
     for attempt in range(2):
         try:
             driver = get_driver()
