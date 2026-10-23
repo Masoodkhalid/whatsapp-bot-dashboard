@@ -556,6 +556,7 @@ This is an automated message. Hope you're doing well!
           <div class="row2">
             <div class="field"><label>Delay between messages (sec)</label><input type="number" id="cDelay" value="35" min="30"/></div>
             <div class="field"><label>WA Web load time (sec)</label><input type="number" id="cWaitTime" value="20" min="10"/></div>
+            <div class="field"><label>Daily limit <span style="color:var(--wa);font-size:.72rem">(0 = unlimited)</span></label><input type="number" id="cDailyLimit" value="50" min="0"/></div>
           </div>
         </div>
       </div>
@@ -1225,9 +1226,10 @@ async function sendByTemplate() {
   const delay     = parseInt(document.getElementById('cDelay').value);
   const wait_time = parseInt(document.getElementById('cWaitTime').value);
   if (!contacts.length) { toast('No contacts — add them on Dashboard first', 'err'); return; }
+  const daily_limit = parseInt(document.getElementById('cDailyLimit').value) || 50;
   const res  = await fetch('/api/bot/start', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({template, delay, wait_time, mode: 'template'}),
+    body: JSON.stringify({template, delay, wait_time, mode: 'template', daily_limit}),
   });
   const d = await res.json();
   if (!d.ok) { toast(d.error || 'Could not start', 'err'); return; }
@@ -1257,7 +1259,7 @@ async function sendByCsv() {
   // Now start the bot — CSV mode uses per-contact custom_message (falls back to template)
   const res = await fetch('/api/bot/start', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({template, delay, wait_time, mode: 'csv'}),
+    body: JSON.stringify({template, delay, wait_time, mode: 'csv', daily_limit: parseInt(document.getElementById('cDailyLimit').value) || 50}),
   });
   const d = await res.json();
   if (!d.ok) { toast(d.error || 'Could not start', 'err'); return; }

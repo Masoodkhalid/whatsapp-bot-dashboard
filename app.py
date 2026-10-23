@@ -401,13 +401,15 @@ def format_message(template: str, contact: dict) -> str:
 
 # ── Bot worker ─────────────────────────────────────────────────────────────────
 
-def bot_worker(template: str, delay: int, wait_time: int, mode: str = "template"):
+def bot_worker(template: str, delay: int, wait_time: int, mode: str = "template", daily_limit: int = 0):
     """
     mode='template' → use template for every contact (ignore custom_message).
     mode='csv'      → use contact's custom_message if set, else fall back to template.
+    daily_limit     → max messages to send this run (0 = unlimited).
     """
     global bot_running
-    push_log(f"Bot started. Mode: {'📋 Template' if mode == 'template' else '📂 CSV (per-contact message)'}.")
+    limit_label = f" | Daily limit: {daily_limit}" if daily_limit else ""
+    push_log(f"Bot started. Mode: {'📋 Template' if mode == 'template' else '📂 CSV'}{limit_label}.")
 
     pending = [c for c in contacts if c.get("status", "").lower() not in ("sent", "skipped")]
 
@@ -415,6 +417,8 @@ def bot_worker(template: str, delay: int, wait_time: int, mode: str = "template"
         push_log("No pending contacts — nothing to send.")
         bot_running = False
         return
+
+    sent_this_run = 0
 
     for i, contact in enumerate(pending, 1):
         if not bot_running:
@@ -472,9 +476,15 @@ def bot_worker(template: str, delay: int, wait_time: int, mode: str = "template"
         append_log_entry(name, phone, msg, status, note)
 
         if ok:
-            push_log(f"✓ Sent: {name} ({phone})")
+            sent_this_run += 1
+            push_log(f"✓ Sent: {name} ({phone})  [{sent_this_run}/{daily_limit if daily_limit else '∞'} today]")
         else:
             push_log(f"✗ FAILED: {name} ({phone}) — {note}")
+
+        # Daily limit reached — stop for today
+        if daily_limit and sent_this_run >= daily_limit:
+            push_log(f"✅ Daily limit of {daily_limit} messages reached. Run the bot again tomorrow for the next batch.")
+            break
 
         if i < len(pending) and bot_running:
             push_log(f"Waiting {delay}s before next message...")
@@ -483,7 +493,8 @@ def bot_worker(template: str, delay: int, wait_time: int, mode: str = "template"
     sent    = sum(1 for c in contacts if c.get("status") == "sent")
     failed  = sum(1 for c in contacts if c.get("status") == "failed")
     skipped = sum(1 for c in contacts if c.get("status") == "skipped")
-    push_log(f"Done. ✓ Sent: {sent}  ✗ Failed: {failed}  — Skipped: {skipped}")
+    remaining = sum(1 for c in contacts if c.get("status", "") not in ("sent", "skipped", "failed"))
+    push_log(f"Done. ✓ Sent: {sent}  ✗ Failed: {failed}  — Skipped: {skipped}  — Remaining: {remaining}")
     bot_running = False
 
 
@@ -565,10 +576,11 @@ def start_bot():
     template  = data.get("template", "Hi {name}!")
     delay     = int(data.get("delay", 35))
     wait_time = int(data.get("wait_time", 20))
-    mode      = data.get("mode", "template")   # "template" or "csv"
+    mode        = data.get("mode", "template")
+    daily_limit = int(data.get("daily_limit", 50))
     bot_running = True
     bot_thread  = threading.Thread(
-        target=bot_worker, args=(template, delay, wait_time, mode), daemon=True
+        target=bot_worker, args=(template, delay, wait_time, mode, daily_limit), daemon=True
     )
     bot_thread.start()
     return jsonify({"ok": True})
